@@ -1,0 +1,145 @@
+#!/bin/python
+# used google AI develop base clang logic to generate ext.h
+# extended to generate ext.c 
+
+import clang.cindex
+import sys
+import os
+
+# --- (Optional) Manual configuration if libclang is not found automatically ---
+# clang.cindex.Config.set_library_file('/usr/lib/llvm-14/lib/libclang.so') 
+
+def get_function_prototype_ifunc(cursor):
+    """Extracts the full function prototype string for a declaration."""
+    return_type = cursor.result_type.spelling
+    func_name = cursor.spelling
+    params = []
+    for child in cursor.get_children():
+        if child.kind == clang.cindex.CursorKind.PARM_DECL:
+            param_type = child.type.spelling
+            param_name = child.spelling
+            params.append(f"{param_type} {param_name}")
+    
+    params_str = ', '.join(params) if params else 'void'
+    return f"extern {return_type} {func_name}({params_str});", f"DECLARE_IFUNC({func_name}, {return_type}, ({params_str}))"
+
+def get_global_variable_declaration(cursor):
+    """Extracts the declaration string for a global variable."""
+    var_name = cursor.spelling
+    var_type = cursor.type.spelling
+    return f"extern {var_type} {var_name};"
+
+def process_files(source_filenames):
+    """
+    Processes multiple C files and aggregates declarations.
+    """
+    index = clang.cindex.Index.create()
+    all_function_prototypes = set() # Use a set to avoid duplicate declarations
+    all_ifuncs = set()
+    all_global_variables = set()
+
+    for source_filename in source_filenames:
+        print(f"Parsing {source_filename}...")
+        tu = index.parse(source_filename, args=['-std=c99'])
+        
+        if not tu:
+            print(f"Error: Unable to parse translation unit for {source_filename}. Skipping.")
+            continue
+
+        for cursor in tu.cursor.get_children():
+            # Only consider declarations belonging to the current source file being parsed
+            if cursor.location.file and os.path.abspath(cursor.location.file.name) != os.path.abspath(source_filename):
+                continue
+
+            if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL and cursor.is_definition():
+                prototype,ifunc = get_function_prototype_ifunc(cursor)
+                if prototype:
+                    all_function_prototypes.add(prototype)
+                if ifunc:
+                    all_ifuncs.add(ifunc)
+                    
+            elif cursor.kind == clang.cindex.CursorKind.VAR_DECL:
+                # Filter out static variables and local variables
+                if cursor.linkage == clang.cindex.Linkage.EXTERNAL and cursor.is_definition():
+                    declaration = get_global_variable_declaration(cursor)
+                    if declaration:
+                        all_global_variables.add(declaration)
+                        
+    return sorted(list(all_global_variables)), sorted(list(all_function_prototypes)), sorted(list(all_ifuncs))
+
+def write_files(header_filename, c_filename, global_vars, func_protos, ifuncs):
+    """Writes the aggregated declarations to a single header file."""
+    include_guard = os.path.basename(header_filename).replace('.', '_').upper() + "_"
+    header_content = [
+        f"#ifndef {include_guard}",
+        f"#define {include_guard}",
+        "",
+        "#ifdef __cplusplus",
+        "extern \"C\" {",
+        "#endif",
+        ""
+    ]
+
+    c_content = [
+        "extern void *dpld_resolver(char * symbol_name);",
+        "",
+        "// macro to define a function as an ifunc and to define a simple",
+        "// resolver that calls the base_resolver",
+        "#define DECLARE_IFUNC(name, rettype, args) \\",
+        "   rettype name args __attribute__((ifunc(#name \"_resolver\"))); \\",
+        "   static rettype (*name##_resolver(void)) args { \\",
+        "      return (rettype (*) args) dpld_resolver(#name); \\",
+        "   } ",
+        ""
+    ]
+    
+    if global_vars:
+        header_content.append("// Global Data Symbols")
+        header_content.extend(global_vars)
+        header_content.append("")
+
+    if func_protos:
+        header_content.append("// Function Prototypes")
+        header_content.extend(func_protos)
+        header_content.append("")
+
+    if ifuncs:
+        c_content.append("// generate ifunc for ext function found");
+        c_content.extend(ifuncs)
+        c_content.append("");
+        
+    header_content.extend([
+        "#ifdef __cplusplus",
+        "}",
+        "#endif",
+        "",
+        f"#endif // {include_guard}"
+    ])
+
+    with open(header_filename, 'w') as f:
+        f.write('\n'.join(header_content))
+
+    with open(c_filename, 'w') as f:
+        f.write('\n'.join(c_content))
+        
+    print(f"\nSuccessfully generated: {header_filename} {c_filename}")
+
+if __name__ == "__main__":
+    # sys.argv[0] is the script name, sys.argv[1:] is the list of source files
+
+    if len(sys.argv) < 4:
+        print(f"Usage: {sys.argv[0]} <output.h> <output.c> <file1.c> [file2.c ...]")
+        sys.exit(1)
+    
+    output_header_name = sys.argv[1]
+    output_c_name = sys.argv[2]
+    source_files = sys.argv[3:]
+
+    # Filter to ensure only .c files are processed (optional safety check)
+    c_files = [f for f in source_files if f.endswith('.c')]
+    if not c_files:
+        print("Error: No valid .c files provided for processing.")
+        sys.exit(1)
+            
+    globals_list, functions_list, ifunc_list = process_files(c_files)
+    write_files(output_header_name, output_c_name, globals_list, functions_list, ifunc_list)

@@ -1,0 +1,6 @@
+*~
+extension.h
+*.a
+*.so
+*.o
+.ext/*

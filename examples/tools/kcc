@@ -1,0 +1,273 @@
+#!/bin/bash
+#set -x
+scriptdir=$(dirname $(realpath $0))
+configdir=$scriptdir/config
+
+findSymlib()
+{
+    function fsymlib() {
+	if [[ -d Symlib ]]; then
+	    echo $(pwd -P)/Symlib
+	elif [[ $(pwd -P) != / ]]; then
+	    cd ..
+	    fsymlib
+	fi
+    }
+    cd $scriptdir
+    fsymlib
+}
+
+findlinuxdir()
+{
+    if [[ -d linux ]]; then
+	echo $(pwd -P)/linux
+    elif [[ $(pwd -P) != $HOME ]]; then
+	cd ..
+	findlinuxdir
+    fi
+}
+
+[[ -z $LINUX_BUILD_PATH ]] && [[ -a $configdir/LINUX_BUILD_PATH ]] \
+    && LINUX_BUILD_PATH=$(< $configdir/LINUX_BUILD_PATH)
+
+[[ -z $LINUX_BUILD_PATH ]] && LINUX_BUILD_PATH=$(findlinuxdir)
+
+[[ -z $LINUX_BUILD_PATH ]] && {
+    echo "ERROR: LINUX_BUILD_PATH not set.  Either environment variable to path of your linux build or put path in $configdir/LINUX_BUILD_PATH" > /dev/stderr
+    exit -1
+}
+
+symlibdir=$(findSymlib)
+
+[[ -z $symlibdir ]] && {
+    echo "ERROR: can't seem to find a Symlib. Need to checkout Symlib and build it." > /dev/stderr
+    exit -1
+}
+   
+[[ -d $symlibdir/dynam_build/libSym.so ]] && {
+    echo "ERROR: can't find $symlibdir/dynam_build/libSym.so ... maybe you need to build it." > /dev/stderr 
+    exit -1
+}
+
+LINUX_BUILD_PATH=${LINUX_BUILD_PATH:-$(realpath ../linux)}
+curdir=$PWD
+tmpdir=$curdir/.ext
+
+[[ ! -d $tmpdir ]] && mkdir $tmpdir
+
+target=${target:-ext.kbin}
+name=${target%.kbin}
+
+[[ -z $target ]] && {
+    echo "USAGE: kcc [source]"
+    exit -1
+}
+
+if (( $# > 0 )); then
+    src=( $@ )
+else
+    src=( $(find $PWD -maxdepth 1 -name '*.kc') )
+fi
+
+(( ! ${#src[@]} ))  && {
+    echo "No .kc source files" > /dev/stderr
+    exit -1
+}
+
+declare -a cfiles
+for s in ${src[@]}; do
+    [[ ! -a $s ]] && {
+	echo "Can't find $s" > /dev/stderr
+	continue
+    }
+    t=$(basename ${s%.kc}.c)
+    [[ ! -a $tmpdir/$t ]] && ln -s $s $tmpdir/$t
+    cfiles+=($t)
+done
+
+
+[[ ! -a $tmpdir/init.c ]] && {
+    cat > $tmpdir/init.c <<EOF
+#include <linux/module.h>
+
+//  Define the module metadata.
+#define MODULE_NAME "DYNPRIV_EXTENSION"
+MODULE_AUTHOR("BU SESA");
+MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("BU SESA DYNPRIV PROCESS EXTENSION");
+MODULE_VERSION("0.1b");
+
+//  Define the name parameter.
+static char *name = "dynpriv extension";
+module_param(name, charp, S_IRUGO);
+MODULE_PARM_DESC(name, "The name to display in /var/log/kern.log");
+
+
+static int __init extension_init(void)
+{
+  pr_info("%s: module loaded at 0x%p\n", MODULE_NAME, extension_init);
+  pr_info("%s: args: name=%s\n", MODULE_NAME, name);
+  return 0;
+}
+
+static void __exit extension_exit(void)
+{
+    pr_info("%s: goodbye %s\n", MODULE_NAME, name);
+    pr_info("%s: module unloaded from 0x%p\n", MODULE_NAME, extension_exit);
+}
+
+module_init(extension_init);
+module_exit(extension_exit);
+EOF
+}
+
+[[ ! -a $tmpdir/dpld.c ]] && {
+    cat > $tmpdir/dpld.c <<EOF
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <elf.h>
+#include "LINF/sym_all.h"
+#include "L1/stack_switch.h"
+
+static int module_loaded = 0;
+static int verbose       = 1;
+
+extern unsigned long kallsyms_lookup_name(const char *name);
+
+#define VPRINTF(fmt, ...) do { \
+  if (verbose) {				\
+    fprintf(stderr, fmt, ##__VA_ARGS__);	\
+  }						\
+} while(0)
+
+extern const uint8_t _binary_ext_ko_start[];
+extern const uint8_t _binary_ext_ko_end[];
+extern const uint8_t _binary_ext_ko_size;
+
+// extern int load_module(struct load_info *info, char *uargs,int flags);
+extern int __x64_sys_init_module(void* args);
+
+
+//__x64_sys_init_module expects the arguments to be on the stack
+void do_load_module(void* umod, unsigned long len, char* uargs, int* ret_out) {
+    //prepare argument passing
+    // mov    0x60(%rdi),%rdx
+    // mov    0x68(%rdi),%rsi
+    // mov    0x70(%rdi),%rdi
+    
+    uint64_t args[3];
+    args[0] = (uint64_t)uargs; //rdx
+    args[1] = (uint64_t)len; //rsi
+    args[2] = (uint64_t)umod; //rdi
+
+    int ret = __x64_sys_init_module((void*)(args) - 0x60);
+    if (ret_out) {
+        *ret_out = ret;
+    }
+}
+
+//assume sym_elevate has been called before this function
+int load_ext_module() {
+    VPRINTF("starting load_ext_module\n");
+    
+    int ret = 0;
+    size_t size = (size_t)&_binary_ext_ko_size;
+	
+    VPRINTF("starting load_module\n");
+    char * uargs = "name=Hansi";
+
+
+    VPRINTF("do_load_module: umod=%p len=%lu uargs=%p\n", uargs, size, uargs);
+
+    SYM_ON_KERN_STACK_DO(do_load_module((void*)_binary_ext_ko_start, size, uargs, &ret));
+    
+    VPRINTF("do_load_module: exited __x64_sys_init_module ret=%d\n", ret);
+    
+    
+    VPRINTF("exited load_module ret=%d\n", ret);
+    return ret;
+}
+
+
+//resolves a symbol by name, loading the module if necessary
+//this is for symbols from the kernel module included in our fat binary
+void* dpld_resolver(char* symbol_name) {
+  VPRINTF("%s: Resolving symbol %s\n", __func__, symbol_name);
+  
+  if (!module_loaded) {
+    int rc;
+    
+    rc = load_ext_module();
+    if (rc != 0) {
+      VPRINTF("Failed to load ext module: %d\n", rc);
+      exit(1);
+    }
+    VPRINTF("Loaded kallsyms module\n");
+    
+    module_loaded = 1;
+  }
+  
+  sym_elevate();
+  unsigned long addr = kallsyms_lookup_name(symbol_name);
+  VPRINTF("Resolved symbol %s to address %p\n", symbol_name, (void*)addr);
+  sym_lower();
+  
+  if (addr == 0) {
+    VPRINTF("Symbol %s not found!\n", symbol_name);
+    //exit program! We have a linkage problem
+    exit(1);
+  }
+  return (void*)addr;
+}
+
+EOF
+}
+
+cat > $tmpdir/Makefile <<EOF
+obj-m += ${name}.o
+${name}-y := \$(patsubst %.c,%.o,$cfiles) init.o
+ccflags-y := -I $curdir
+.PHONY: all clean
+
+all: libextension.a
+
+ext.kbin: ext.ko
+	ld -r -b binary -z noexecstack -o \$@ \$<
+
+ext.ko:
+	make -C ${LINUX_BUILD_PATH} M=${tmpdir} modules
+
+libextension.a: dpld.o extension.o ext.kbin
+	ar rcs \$@ \$^
+
+dpld.o: dpld.c
+	gcc -Wall -Wextra -mno-red-zone -fno-omit-frame-pointer -Wfatal-errors -fPIC -I $symlibdir/include -DDDYNLINK -c -o \$@ \$<
+
+extension.o: extension.c
+	gcc -c -o \$@ \$<
+
+extension.c extension.h: $cfiles
+	$scriptdir/genifunc extension.h \$@ \$^
+
+clean:
+	make -C ${LINUX_BUILD_PATH} M=${tmpdir} clean
+	-rm -rf \$(wildcard *.o extension.c extension.h libextension.a ext.ko ext.bin )
+
+EOF
+
+make -C $tmpdir
+
+(( $? )) && {
+    echo "ERROR: look in $tmpdir" > /dev/stderr
+    exit -1
+}
+
+rtdir=$(realpath --relative-to=$PWD $tmpdir)
+
+[[ ! -a extension.h ]] && ln -s $rtdir/extension.h .
+[[ ! -a libextension.a ]] && ln -s $rtdir/libextension.a .
+cp /proc/libkallsyms.so /proc/libkallsyms.a $curdir
+
+#[[ ! -a ext.kbin ]] && ln -s $rtdir/ext.kbin .
+exit 0
