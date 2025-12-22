@@ -30,3 +30,6 @@ gdb_scripts
 
 i_load_mod
 i_load_mod_static
+
+.cache
+.cache/*

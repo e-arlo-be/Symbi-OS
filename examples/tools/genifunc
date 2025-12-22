@@ -1,4 +1,4 @@
-#!/bin/python
+#!../.venv/bin/python
 # used google AI develop base clang logic to generate ext.h
 # extended to generate ext.c 
 

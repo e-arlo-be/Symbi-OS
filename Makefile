@@ -55,11 +55,13 @@ master_clean:
 6.16.0-kElevate: KERN_EXTRAVERSION=-kElevate
 6.16.0-kElevate: LINUX_BUILD=--branch dynam_priv-6.16 --single-branch --depth 1
 6.16.0-kElevate: KERN_VER=$(KERN_REL)$(KERN_EXTRAVERSION)
-6.16.0-kElevate: CONFIG=$(HOME)/linuxConfigs/5.14/USE_ME/symbiote_config
+# 6.16.0-kElevate: CONFIG=$(HOME)/linuxConfigs/5.14/USE_ME/symbiote_config
+6.16.0-kElevate: CONFIG=$(HOME)/../linuxConfigs/6.16/config-6.16.8-200.fc42.x86_64_Elevate
 6.16.0-kElevate: LOCAL_LINUX_PATH=./linux
 
 # 6.16.0-kElevate: l_all
-6.16.0-kElevate: master
+# 6.16.0-kElevate: l_mrproper 
+6.16.0-kElevate: l_build 
 # 6.16.0-kElevate: l_cp l_initrd
 # 6.16.0-kElevate: l_initrd
 # 6.16.0-kElevate: l_cp_vmlinux
@@ -99,7 +101,7 @@ l_all: docker_prepare_linux_build l_mrproper l_config l_build l_ins l_cp l_initr
 # 5.14.0-kElevate: docker_prepare_linux_build
 # 5.14.0-kElevate: l_build 
 # 5.14.0-kElevate: l_ins l_cp l_initrd
-5.14.0-kElevate: l_build l_ins l_cp l_initrd
+5.14.0-kElevate: l_build 
 # 5.14.0-kElevate: l_config
 # 5.14.0-kElevate: grubby_add_kern enable_sudo_pw_checking 
 # 5.14.0-kElevate: grubby_set_kele_default_and_reboot
@@ -119,8 +121,11 @@ l_all: docker_prepare_linux_build l_mrproper l_config l_build l_ins l_cp l_initr
 CONT=linux_builder$(FEDORA_RELEASE)
 RUN_IN_CONT=sudo docker exec $(CONT)
 RUN_IN_CONT_IT=sudo docker exec -it $(CONT)
+RUN_IN_CONT=
+RUN_IN_CONT_IT=
 
-HOME=/root
+# HOME=/root
+HOME=$(PWD)
 LINUX_PATH=$(HOME)/linux
 NUM_CPUS=$(shell nproc)
 
