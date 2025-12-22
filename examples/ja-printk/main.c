@@ -7,11 +7,14 @@
 extern int _printk(const char *fmt, ...);
 
 int main() {
+    volatile void * _printk_ptr;
+    _printk_ptr = (void *)_printk;
 
-    printf("main: calling elevate\n");
+    printf("main: calling elevate: %p \n", _printk_ptr);
+
     sym_elevate();
+    _printk("hello world\n");
     printf("main: called elevate\n");
-
     //run kernel_add
     int sum = kernel_add(3, 4);
     printf("printf: kernel_add(3, 4) = %d\n", sum);
