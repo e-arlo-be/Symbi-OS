@@ -61,7 +61,7 @@ master_clean:
 
 # 6.16.0-kElevate: l_all
 # 6.16.0-kElevate: l_mrproper 
-6.16.0-kElevate: l_build 
+6.16.0-kElevate: l_build l_ins
 # 6.16.0-kElevate: l_cp l_initrd
 # 6.16.0-kElevate: l_initrd
 # 6.16.0-kElevate: l_cp_vmlinux
@@ -121,8 +121,8 @@ l_all: docker_prepare_linux_build l_mrproper l_config l_build l_ins l_cp l_initr
 CONT=linux_builder$(FEDORA_RELEASE)
 RUN_IN_CONT=sudo docker exec $(CONT)
 RUN_IN_CONT_IT=sudo docker exec -it $(CONT)
-RUN_IN_CONT=
-RUN_IN_CONT_IT=
+RUN_IN_CONT=sudo 
+RUN_IN_CONT_IT=sudo 
 
 # HOME=/root
 HOME=$(PWD)
@@ -362,13 +362,14 @@ copy_module_src:
 	sudo docker cp $(MODULE_SRC)/. $(CONT):$(MODULE_DEST)
 
 build_module_in_container:
-	$(RUN_IN_CONT) sh -c 'cd $(MODULE_DEST) && make -C $(KERNEL_BUILD_PATH) M=$(MODULE_DEST) V=1 modules'
+	$(RUN_IN_CONT) sh -c 'cd $(MODULE_SRC) && make -C $(KERNEL_BUILD_PATH) M=$(MODULE_SRC) V=1 modules'
 
 copy_module_back:
 	mkdir -p $(MODULE_LOCAL_DEST)
-	sudo docker cp $(CONT):$(MODULE_DEST)/$(MODULE_NAME).ko $(MODULE_LOCAL_DEST)
+	cp $(MODULE_SRC)/$(MODULE_NAME).ko $(MODULE_LOCAL_DEST)
+# 	sudo docker cp $(CONT):$(MODULE_DEST)/$(MODULE_NAME).ko $(MODULE_LOCAL_DEST)
 
-build_module_full: copy_module_src build_module_in_container copy_module_back
+build_module_full: build_module_in_container 
 
 
 copy_kallsyms_src:

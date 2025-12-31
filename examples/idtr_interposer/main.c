@@ -12,28 +12,32 @@ DECLARE_IFUNC(setup_df_interposition, void, (void))
 
 //native kernel function that will be resolved at load time
 extern int _printk(const char *fmt, ...);
-
+extern uintptr_t ktos;
 
 int main() {
 
-    printf("main: calling elevate\n");
-    sym_elevate();
-    printf("main: called elevate\n");
 
     //run print_idt_entries
-    print_idt_entries();
-    printf("printf: called print_idt_entries()\n");
-
-    setup_df_interposition();
-    printf("printf: called setup_df_interposition()\n");
-
-    print_idt_entries();
-    printf("printf: called print_idt_entries() again\n");
-
-    sym_lower();
+    // SYM_ON_KERN_STACK_DYNSYM_DO(ktos, print_idt_entries());
+    // printf("printf: called print_idt_entries()\n");
+    {
+        SYM_ON_KERN_STACK_DYNSYM_DO(ktos, setup_df_interposition());
+        printf("printf: called setup_df_interposition()\n");
+    }
+    
+    {
+        // print_idt_entries();
+        SYM_ON_KERN_STACK_DYNSYM_DO(ktos, print_idt_entries());
+        printf("printf: called print_idt_entries() again\n");
+    }
     
     printf("DONE\n");
     return 0;
 }
 
-// sudo LD_BIND_NOW=1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./main
+/*
+set environment LD_BIND_NOW=1 
+set environment LD_LIBRARY_PATH=/home/user/Symbi-OS/Symlib/dynam_build:.
+
+sudo LD_BIND_NOW=1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./main
+*/

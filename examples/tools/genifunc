@@ -60,7 +60,7 @@ def process_files(source_filenames):
                     
             elif cursor.kind == clang.cindex.CursorKind.VAR_DECL:
                 # Filter out static variables and local variables
-                if cursor.linkage == clang.cindex.Linkage.EXTERNAL and cursor.is_definition():
+                if cursor.linkage == clang.cindex.LinkageKind.EXTERNAL and cursor.is_definition():
                     declaration = get_global_variable_declaration(cursor)
                     if declaration:
                         all_global_variables.add(declaration)
