@@ -21,7 +21,7 @@ def get_function_prototype_ifunc(cursor):
             params.append(f"{param_type} {param_name}")
     
     params_str = ', '.join(params) if params else 'void'
-    return f"extern {return_type} {func_name}({params_str});", f"DECLARE_IFUNC({func_name}, {return_type}, ({params_str}))"
+    return f"extern {return_type} {func_name}({params_str});", f"DECLARE_IFUNC({func_name}, {return_type}, ({params_str}))", f"    void* {func_name};", f"DEFINE_GOT_FUNC({func_name}, {return_type}, ({params_str}))"
 
 def get_global_variable_declaration(cursor):
     """Extracts the declaration string for a global variable."""
@@ -29,7 +29,7 @@ def get_global_variable_declaration(cursor):
     var_type = cursor.type.spelling
     return f"extern {var_type} {var_name};"
 
-def process_files(source_filenames):
+def process_ext_files(source_filenames):
     """
     Processes multiple C files and aggregates declarations.
     """
@@ -37,6 +37,8 @@ def process_files(source_filenames):
     all_function_prototypes = set() # Use a set to avoid duplicate declarations
     all_ifuncs = set()
     all_global_variables = set()
+
+    all_function_prototypes.add("extern void set_app_got(app_gott_t* got);")  # Manually add set_app_got declaration
 
     for source_filename in source_filenames:
         print(f"Parsing {source_filename}...")
@@ -52,7 +54,7 @@ def process_files(source_filenames):
                 continue
 
             if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL and cursor.is_definition():
-                prototype,ifunc = get_function_prototype_ifunc(cursor)
+                prototype,ifunc,_,_ = get_function_prototype_ifunc(cursor)
                 if prototype:
                     all_function_prototypes.add(prototype)
                 if ifunc:
@@ -67,7 +69,47 @@ def process_files(source_filenames):
                         
     return sorted(list(all_global_variables)), sorted(list(all_function_prototypes)), sorted(list(all_ifuncs))
 
-def write_files(header_filename, c_filename, global_vars, func_protos, ifuncs):
+def process_app_files(source_filenames):
+    """
+    Processes multiple C files and aggregates function prototypes and GOT declarations.
+    """
+    index = clang.cindex.Index.create()
+    all_function_prototypes = set() # Use a set to avoid duplicate declarations
+    got_declarations = set()
+    function_definitions = set()
+    got_derefs = set()
+
+    for source_filename in source_filenames:
+        print(f"Parsing {source_filename}...")
+        tu = index.parse(source_filename, args=['-std=c99'])
+        
+        if not tu:
+            print(f"Error: Unable to parse translation unit for {source_filename}. Skipping.")
+            continue
+
+        for cursor in tu.cursor.get_children():
+            # Only consider declarations belonging to the current source file being parsed
+            if cursor.location.file and os.path.abspath(cursor.location.file.name) != os.path.abspath(source_filename):
+                continue
+
+            if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL and cursor.is_definition():
+                prototype, _, got_declaration, function_definition = get_function_prototype_ifunc(cursor)
+                if prototype:
+                    all_function_prototypes.add(prototype)
+                if got_declaration:
+                    got_declarations.add(got_declaration)
+                if function_definition:
+                    function_definitions.add(function_definition)
+                    
+            elif cursor.kind == clang.cindex.CursorKind.VAR_DECL:
+                continue # We can not link to global variables from the application because of the kernels memory model (32 bit relative addressing)
+
+
+    return sorted(list(all_function_prototypes)), sorted(list(got_declarations)), sorted(list(function_definitions))
+
+
+
+def write_ext_files(header_filename, c_filename, global_vars, func_protos, ifuncs):
     """Writes the aggregated declarations to a single header file."""
     include_guard = os.path.basename(header_filename).replace('.', '_').upper() + "_"
     header_content = [
@@ -77,6 +119,7 @@ def write_files(header_filename, c_filename, global_vars, func_protos, ifuncs):
         "#ifdef __cplusplus",
         "extern \"C\" {",
         "#endif",
+        "#include \"app.h\"",
         ""
     ]
 
@@ -124,22 +167,98 @@ def write_files(header_filename, c_filename, global_vars, func_protos, ifuncs):
         
     print(f"\nSuccessfully generated: {header_filename} {c_filename}")
 
+def write_app_files(header_filename, c_filename, func_protos, got_declarations, function_definitions):
+    """Writes the app file with function prototypes and GOT declarations."""
+    include_guard = os.path.basename(header_filename).replace('.', '_').upper() + "_"
+    header_content = [
+        f"#ifndef {include_guard}",
+        f"#define {include_guard}",
+        "",
+        "#ifdef __cplusplus",
+        "extern \"C\" {",
+        "#endif",
+        ""
+    ]
+
+    c_content = [
+        "#include \"app.h\"",
+        "",
+        "#define DEFINE_GOT_FUNC(func_name, rettype, args) \\",
+        "rettype func_name args { \\",
+        "void* target = app_got->func_name; \\",
+        "asm volatile ( \\",
+        "   \"jmp *%0\" \\",
+        "   : \\",
+        "   : \"r\"(target) \\",
+        "   ); \\",
+        "}",
+        "",
+        "app_gott_t* app_got;",
+        ""
+    ]
+
+    if got_declarations:
+        header_content.append("typedef struct {")
+        header_content.append("// GOT Declarations")
+        header_content.extend(got_declarations)
+        header_content.append("} app_gott_t;")
+        header_content.append("")
+
+    if func_protos:
+        header_content.append("// Function Prototypes")
+        header_content.extend(func_protos)
+        header_content.append("")
+
+    if function_definitions:
+        c_content.append("// Function Definitions")
+        c_content.extend(function_definitions)
+
+
+    header_content.extend([
+        "#ifdef __cplusplus",
+        "}",
+        "#endif",
+        "",
+        f"#endif // {include_guard}"
+    ])
+
+    with open(header_filename, 'w') as f:
+        f.write('\n'.join(header_content))
+
+    with open(c_filename, 'w') as f:
+        f.write('\n'.join(c_content))
+        
+    print(f"\nSuccessfully generated: {header_filename} {c_filename}")
+
+
+
 if __name__ == "__main__":
     # sys.argv[0] is the script name, sys.argv[1:] is the list of source files
 
-    if len(sys.argv) < 4:
-        print(f"Usage: {sys.argv[0]} <output.h> <output.c> <file1.c> [file2.c ...]")
+    if len(sys.argv) < 7:
+        print(f"Usage: {sys.argv[0]} <outputA.h> <outputA.c> <outputB.h> <outputB.c> <app_directory> <file1.c> [file2.c ...]")
         sys.exit(1)
     
     output_header_name = sys.argv[1]
     output_c_name = sys.argv[2]
-    source_files = sys.argv[3:]
+    output_header_name_b = sys.argv[3]
+    output_c_name_b = sys.argv[4]
+    app_directory = sys.argv[5]
+    source_files = sys.argv[6:]
 
     # Filter to ensure only .c files are processed (optional safety check)
     c_files = [f for f in source_files if f.endswith('.c')]
     if not c_files:
         print("Error: No valid .c files provided for processing.")
         sys.exit(1)
-            
-    globals_list, functions_list, ifunc_list = process_files(c_files)
-    write_files(output_header_name, output_c_name, globals_list, functions_list, ifunc_list)
+
+
+    globals_list, functions_list, ifunc_list = process_ext_files(c_files)
+    write_ext_files(output_header_name, output_c_name, globals_list, functions_list, ifunc_list)
+    
+    
+    app_cfiles = [os.path.join(app_directory, f) for f in os.listdir(app_directory) if f.endswith('.c')]
+    app_functions_list, got_declarations, function_definitions = process_app_files(app_cfiles)
+    write_app_files(output_header_name_b, output_c_name_b, app_functions_list, got_declarations, function_definitions)
+
+

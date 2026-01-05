@@ -90,6 +90,10 @@ done
 [[ ! -a $tmpdir/init.c ]] && {
     cat > $tmpdir/init.c <<EOF
 #include <linux/module.h>
+#include "extension.h"
+
+//  Define GOT
+app_gott_t* app_got;
 
 //  Define the module metadata.
 #define MODULE_NAME "DYNPRIV_EXTENSION"
@@ -117,6 +121,11 @@ static void __exit extension_exit(void)
     pr_info("%s: module unloaded from 0x%p\n", MODULE_NAME, extension_exit);
 }
 
+void set_app_got(app_gott_t* got) {
+    app_got = got;
+    pr_info("%s: app_got set to 0x%p\n", MODULE_NAME, app_got);
+}
+
 module_init(extension_init);
 module_exit(extension_exit);
 EOF
@@ -137,7 +146,7 @@ all: libextension.a
 ext.kbin: ext.ko
 	ld -r -b binary -z noexecstack -o \$@ \$<
 
-ext.ko:
+ext.ko: ${cfiles[@]}
 	make -C ${LINUX_BUILD_PATH} M=${tmpdir} modules
 
 libextension.a: dpld.o extension.o ext.kbin
