@@ -93,7 +93,7 @@ done
 #include "extension.h"
 
 //  Define GOT
-app_gott_t* app_got;
+app_got_t* app_got;
 
 //  Define the module metadata.
 #define MODULE_NAME "DYNPRIV_EXTENSION"
@@ -121,7 +121,7 @@ static void __exit extension_exit(void)
     pr_info("%s: module unloaded from 0x%p\n", MODULE_NAME, extension_exit);
 }
 
-void set_app_got(app_gott_t* got) {
+void set_app_got(app_got_t* got) {
     app_got = got;
     pr_info("%s: app_got set to 0x%p\n", MODULE_NAME, app_got);
 }
@@ -159,7 +159,7 @@ extension.o: extension.c
 	gcc -c -o \$@ \$<
 
 extension.c extension.h: ${cfiles[@]}
-	$scriptdir/genifunc extension.h \$@ \$^
+	$scriptdir/genifunc extension.h \$@ app.h .. \$^
 
 clean:
 	make -C ${LINUX_BUILD_PATH} M=${tmpdir} clean
@@ -177,6 +177,7 @@ make -C $tmpdir
 rtdir=$(realpath --relative-to=$PWD $tmpdir)
 
 [[ ! -a extension.h ]] && ln -s $rtdir/extension.h .
+[[ ! -a app.h ]] && ln -s $rtdir/app.h .
 [[ ! -a libextension.a ]] && ln -s $rtdir/libextension.a .
 cp /proc/libkallsyms.so /proc/libkallsyms.a $curdir
 
