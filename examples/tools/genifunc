@@ -189,7 +189,7 @@ def write_app_files(header_filename, func_protos, got_declarations, function_def
         "   : \\",
         "   : \"r\"(app_got->func_name) \\",
         "   ); \\",
-        "   return (rettype)0; \\",
+        "   unreachable(); \\",
         "}",
         "",
         "#endif"
