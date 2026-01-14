@@ -62,10 +62,10 @@ def process_ext_files(source_filenames):
                     
             elif cursor.kind == clang.cindex.CursorKind.VAR_DECL:
                 # Filter out static variables and local variables
-                if cursor.linkage == clang.cindex.LinkageKind.EXTERNAL and cursor.is_definition():
-                    declaration = get_global_variable_declaration(cursor)
-                    if declaration:
-                        all_global_variables.add(declaration)
+                #if cursor.linkage == clang.cindex.Linkage.EXTERNAL and cursor.is_definition():
+                declaration = get_global_variable_declaration(cursor)
+                if declaration:
+                    all_global_variables.add(declaration)
                         
     return sorted(list(all_global_variables)), sorted(list(all_function_prototypes)), sorted(list(all_ifuncs))
 
@@ -180,6 +180,9 @@ def write_app_files(header_filename, func_protos, got_declarations, function_def
         "#ifdef __cplusplus",
         "extern \"C\" {",
         "#endif",
+        "",
+        "#define SET_APP_GOT_FUNC(func_name) \\",
+        "    app_got->func_name = (void *)&func_name;",
         "",
         "#ifdef __KERNEL__",
         "#define DEFINE_GOT_FUNC(func_name, rettype, args) \\",

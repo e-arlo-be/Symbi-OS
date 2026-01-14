@@ -1,0 +1,80 @@
+#include <asm/desc.h>
+#include <asm/idtentry.h>
+
+void * pf_hdlr_addr(void);
+
+unsigned long int pf_adaptor_orig_pf_asm_entry = 0;
+unsigned long int pf_adaptor_cnt = 0;
+
+void * pf_hdlr_addr()
+{
+
+  struct desc_ptr idtr;
+  gate_desc *idt_table;
+  gate_desc *entry;
+  intptr_t   val;
+
+  if (pf_adaptor_orig_pf_asm_entry == 0) {
+    store_idt(&idtr);	
+    val = idtr.address;   
+    idt_table = (gate_desc *)val; 
+    entry = &(idt_table[X86_TRAP_PF]);
+    val = gate_offset(entry);
+    pf_adaptor_orig_pf_asm_entry = val;
+  } else {
+    val = pf_adaptor_orig_pf_asm_entry;
+  }
+
+  return (void *)val;
+}
+
+/*
+	Generating a new pagefault exception entry point that can be dispatched
+	directly in response to the page fault which adjusts the error code
+	prior to continuing on the original pagefault path.
+
+	The standard linux way of defining a pagefault code path happens as a dance between
+	arch/x86/include/asm/idtenty.h
+	arch/x86/entry_32.S
+	arch/x86/mm/fault.c
+
+	entry_32.S  defines a bunch of macros that define the boiler plate code
+	for trap handling -- specifically the one we care about is
+	    .macro idtentry vector asmsym cfunc has_error_code:req
+        which itself depends on several other assembly macros in this file and in others
+
+        Unfortunately entry_32.S directly includes idtentry.h
+
+	idtentry.h has both ASSEMBLY and C specific code in it when included by entry_32.S
+	we trigger the ASSEMBLY specific behaviour that:
+	    1. defines a set of cpp macros that in an assembly file will be defined in terms
+	       of the assembly macros in entry_32.S eg. idtentry
+	       specifically:
+	            DECLARE_IDTENTRY_ERRORCODE(vector, func) \
+		         	idtentry vector asm_##func func has_error_code=0
+		    DECLARE_IDTENTRY_RAW_ERRORCODE(vector, func) \
+	                        DECLARE_IDTENTRY_ERRORCODE(vector, func)
+	    2. it uses these to then create the assembly entry points when include in entry for
+	       page fault handling:
+	             DECLARE_IDTENTRY_RAW_ERRORCODE(X86_TRAP_PF,	exc_page_fault);
+		     
+	So in this way entry_32.o will contain the definition for asm_exec_page_fault
+	that is hardwired to
+	    1. if Supervisor Mode Access Prevention (SMAP) is present/enabled (at boot) this
+	       code will be patched to invoke Clear Access Flag (CLAC) in eflags.
+	          This both disable user mode alignment checks and allows kernel code to access
+	          user mode pages see (https://lwn.net/Articles/517475/ and 
+	In the end I think it makes most sense to revert back to treating this adaptor
+	as a small HW specific change that stands infront of the standard path
+	rather than a compeltely new page fault path that would require refactoring
+	the standard linux code
+	DEFINE_IDTENTRY_RAW_ERRORCODE(exc_adaptor_page_fault)
+{
+  printk("hello");
+}
+
+*/
+
+
+
+

@@ -67,23 +67,30 @@ name=${target%.kbin}
 if (( $# > 0 )); then
     src=( $@ )
 else
-    src=( $(find $PWD -maxdepth 1 -name '*.kc') )
+    src=( $(find $PWD -maxdepth 1 -name '*.kc' -o  -name '*.kS') )
 fi
 
 (( ! ${#src[@]} ))  && {
-    echo "No .kc source files" > /dev/stderr
+    echo "No .kc or .kS source files" > /dev/stderr
     exit -1
 }
 
 declare -a cfiles
+declare -a asmfiles
+
 for s in ${src[@]}; do
     [[ ! -a $s ]] && {
 	echo "Can't find $s" > /dev/stderr
 	continue
     }
-    t=$(basename ${s%.kc}.c)
+    if [[ $s =~ \.kc$ ]]; then 
+	t=$(basename ${s%.kc}.c)
+	cfiles+=($t)
+    else
+	t=$(basename ${s%.kS}.S)
+	asmfiles+=($t)
+    fi
     [[ ! -a $tmpdir/$t ]] && ln -s $s $tmpdir/$t
-    cfiles+=($t)
 done
 
 
@@ -137,9 +144,9 @@ EOF
 
 cat > $tmpdir/Makefile <<EOF
 obj-m += ${name}.o
-${name}-y := \$(patsubst %.c,%.o,${cfiles[@]}) init.o
+${name}-y := \$(patsubst %.c,%.o,${cfiles[@]}) \$(patsubst %.S,%.o,${asmfiles[@]}) init.o
 ccflags-y := -I $curdir
-.PHONY: all clean
+.PHONY: all clean ext.ko
 
 all: libextension.a
 
