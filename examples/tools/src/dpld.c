@@ -9,10 +9,16 @@
 #include "LINF/sym_all.h"
 #include "L1/stack_switch.h"
 
+#define DECLARE_ALL_FUNCS
+#include "app.h"
+
 static int module_loaded = 0;
-static int verbose       = 0;
+static int verbose       = 1;
 
 extern unsigned long kallsyms_lookup_name(const char *name);
+extern void* vmalloc_noprof(unsigned long size);
+
+void (*set_app_got)(app_got_t* got);
 
 #define VPRINTF(fmt, ...) do {					\
     if (verbose) { fprintf(stderr, fmt, ##__VA_ARGS__); }	\
@@ -96,7 +102,6 @@ int load_ext_module() {
   
   VPRINTF("do_load_module: exited __x64_sys_init_module ret=%d\n", ret);
   
-  
   VPRINTF("exited load_module ret=%d\n", ret);
   return ret;
 }
@@ -115,6 +120,24 @@ void* dpld_resolver(char* symbol_name) {
       exit(1);
     }
     VPRINTF("Loaded kallsyms module\n");
+
+    sym_elevate();
+    set_app_got = (void (*)(app_got_t *))kallsyms_lookup_name("set_app_got");;
+    if (!set_app_got) {
+      VPRINTF("Failed to resolve set_app_got symbol!\n");
+      exit(1);
+    }
+
+    app_got_t* app_got = (app_got_t*)vmalloc_noprof(sizeof(app_got_t));
+    VPRINTF("allocated app_got at %p\n", app_got);
+
+    SET_ALL_GOT_ENTRIES();
+    VPRINTF("Set GOT entries\n");
+    
+    set_app_got(app_got);
+    VPRINTF("Set app got pointer in extension\n");
+    sym_lower();
+    
     
     module_loaded = 1;
   }

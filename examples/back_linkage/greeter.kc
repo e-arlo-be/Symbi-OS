@@ -1,11 +1,11 @@
 #include <linux/pid.h>
-// #include "app.h"
+#include "app.h"
 #include <linux/module.h>
 
 
 // __user_sym__ int user_add(int a, int b);
 
-void*(* dlsym_func)(void*, char*) = NULL;
+static void*(* dlsym_func)(void*, char*) = NULL;
 
 
 int current_pid(void);
@@ -26,17 +26,24 @@ EXPORT_SYMBOL(kernel_add);
 
 
 
-// int kernel_user_add(int a, int b) {
-// 	int res = user_add(a, b);
-// 	pr_info("kernel_user_add: %d + %d = %d\n", a, b, res);
-// 	return res;
-// }
+int kernel_user_add(int a, int b) {
+	int res = user_add(a, b);
+	pr_info("kernel_user_add: %d + %d = %d\n", a, b, res);
+	return res;
+}
 
 
 void dyn_link_example(void* dlsym, void* handle) {
+	// unsigned long long rflags;
+	// asm volatile (
+	// 	"pushfq\n\t"
+	// 	"popq %0\n\t"
+	// 	: "=r"(rflags)
+	// );
+	// pr_info("eflags.IF at entry: %llx\n", (unsigned long long)(rflags & X86_EFLAGS_IF));
 	preempt_disable();
 	void*(* dlsym_func)(void*, char*) = (void*(*)(void*, char*))dlsym;
-	pr_info("dyn_link_example: dlsym passed as %llx\n", (unsigned long long)dlsym);
+	// pr_info("dyn_link_example: dlsym passed as %llx\n", (unsigned long long)dlsym);
 	void* __user__user_add = dlsym_func(handle, "user_add");
 	pr_info("dyn_link_example: user_add at %llx\n", (unsigned long long)__user__user_add);
 	preempt_enable();

@@ -130,7 +130,7 @@ static void __exit extension_exit(void)
 
 void set_app_got(app_got_t* got) {
     app_got = got;
-    pr_info("%s: app_got set to 0x%p\n", MODULE_NAME, app_got);
+    // pr_info("%s: app_got set to 0x%p\n", MODULE_NAME, app_got);
 }
 
 module_init(extension_init);
@@ -159,13 +159,13 @@ ext.ko: ${cfiles[@]}
 libextension.a: dpld.o extension.o ext.kbin
 	ar rcs \$@ \$^
 
-dpld.o: dpld.c
+dpld.o: dpld.c extension.h app.h
 	gcc -Wall -Wextra -mno-red-zone -fno-omit-frame-pointer -Wfatal-errors -fPIC -I $symlibdir/include -DDDYNLINK -c -o \$@ \$<
 
-extension.o: extension.c
+extension.o: extension.c extension.h app.h
 	gcc -c -o \$@ \$<
 
-extension.c extension.h: ${cfiles[@]}
+extension.c extension.h app.h: ${cfiles[@]}
 	$scriptdir/genifunc extension.h \$@ app.h .. \$^
 
 clean:

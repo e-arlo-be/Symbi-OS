@@ -7,14 +7,14 @@
 #include <dlfcn.h>
 
 //include for va_list
-#include <>
+#include <stdarg.h>
 
 extern uintptr_t cpu_current_top_of_stack;
 //native kernel function that will be resolved at load time
 extern int _printk(const char *fmt, ...);
 
 int user_add(int a, int b) {
-    printf("user_add: %d + %d = %d\n", a, b, a + b);
+    // printf("user_add: %d + %d = %d\n", a, b, a + b);
     return a + b;
 }
 
@@ -49,16 +49,25 @@ int main() {
     // _printk("printk: current_pid() = %d\n", pid);
 
     //force linkage of user_add
-    sym_lower();
-    void* dlsym_ret = dlsym(RTLD_DEFAULT, "user_add");
-    printf("main: attempting to call user_add via dlsym, dlsym: %p, &dlsym: %p, dlsym_ret: %p\n", dlsym, &dlsym, dlsym_ret);
-    SYM_ON_KERN_STACK_DYNSYM_DO(ktos, dyn_link_example(dlsym, RTLD_DEFAULT));
-    int userSum = user_add(5, 7);
-    printf("printf: user_add(5, 7) = %d\n", userSum);
-    sym_elevate();
-    _printk("printk: user_add(5, 7) = %d\n", userSum);
+    // sym_lower();
+    // void* dlsym_ret = dlsym(RTLD_DEFAULT, "user_add");
+    // printf("main: attempting to call user_add via dlsym, dlsym: %p, &dlsym: %p, dlsym_ret: %p\n", dlsym, &dlsym, dlsym_ret);
+    // SYM_ON_KERN_STACK_DYNSYM_DO(ktos, dyn_link_example(dlsym, RTLD_DEFAULT));
+    // int userSum = user_add(5, 7);
+    // printf("printf: user_add(5, 7) = %d\n", userSum);
+    // sym_elevate();
+    // _printk("printk: user_add(5, 7) = %d\n", userSum);
 
+    
+    sum = kernel_user_add(10, 15);
+    _printk("printk: kernel_user_add(10, 15) = %d\n", sum);
     sym_lower();
+    
+    printf("printf: kernel_user_add(10, 15) = %d\n", sum);
+    
+    
+
+
     
     printf("DONE\n");
     return 0;

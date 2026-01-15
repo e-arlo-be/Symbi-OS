@@ -53,6 +53,10 @@ def process_ext_files(source_filenames):
             if cursor.location.file and os.path.abspath(cursor.location.file.name) != os.path.abspath(source_filename):
                 continue
 
+            #dont include static ones
+            if cursor.linkage == clang.cindex.LinkageKind.INTERNAL:
+                continue
+
             if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL and cursor.is_definition():
                 _, prototype,ifunc,_,_ = get_function_prototype_ifunc(cursor)
                 if prototype:
@@ -78,6 +82,7 @@ def process_app_files(source_filenames):
     got_declarations = set()
     function_definitions = set()
     got_derefs = set()
+    func_names = set()
 
     for source_filename in source_filenames:
         print(f"Parsing {source_filename}...")
@@ -92,10 +97,17 @@ def process_app_files(source_filenames):
             if cursor.location.file and os.path.abspath(cursor.location.file.name) != os.path.abspath(source_filename):
                 continue
 
+            #dont include static ones
+            if cursor.linkage == clang.cindex.LinkageKind.INTERNAL:
+                continue
+
+
             if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL and cursor.is_definition():
                 func_name, prototype, _, got_declaration, function_definition = get_function_prototype_ifunc(cursor)
                 if func_name == "main":
                     continue  # Skip main function
+                func_names.add(func_name)
+
 
                 if prototype:
                     all_function_prototypes.add(prototype)
@@ -108,7 +120,7 @@ def process_app_files(source_filenames):
                 continue # We can not link to global variables from the application because of the kernels memory model (32 bit relative addressing)
 
 
-    return sorted(list(all_function_prototypes)), sorted(list(got_declarations)), sorted(list(function_definitions))
+    return sorted(list(all_function_prototypes)), sorted(list(got_declarations)), sorted(list(function_definitions)), sorted(list(func_names))
 
 
 
@@ -170,7 +182,7 @@ def write_ext_files(header_filename, c_filename, global_vars, func_protos, ifunc
         
     print(f"\nSuccessfully generated: {header_filename} {c_filename}")
 
-def write_app_files(header_filename, func_protos, got_declarations, function_definitions):
+def write_app_files(header_filename, func_protos, got_declarations, function_definitions, func_names):
     """Writes the app file with function prototypes and GOT declarations."""
     include_guard = os.path.basename(header_filename).replace('.', '_').upper() + "_"
     header_content = [
@@ -186,7 +198,7 @@ def write_app_files(header_filename, func_protos, got_declarations, function_def
         "",
         "#ifdef __KERNEL__",
         "#define DEFINE_GOT_FUNC(func_name, rettype, args) \\",
-        "inline rettype func_name args { \\",
+        "static inline rettype func_name args { \\",
         "asm volatile ( \\",
         "   \"jmp *%0\" \\",
         "   : \\",
@@ -217,6 +229,22 @@ def write_app_files(header_filename, func_protos, got_declarations, function_def
         header_content.extend(function_definitions)
         header_content.append("#endif")
 
+    if func_protos:
+        header_content.append("")
+        header_content.append("#ifdef DECLARE_ALL_FUNCS")
+        header_content.append("// Function Prototypes")
+        header_content.extend(func_protos)
+
+        header_content.append("")
+        header_content.append("//Set GOT logic")
+        header_content.append("#define SET_ALL_GOT_ENTRIES() \\")
+
+        for func_name in func_names:
+            header_content.append(f"SET_APP_GOT_FUNC({func_name}); \\")
+        
+        header_content.append("")
+        header_content.append("#endif")
+        header_content.append("")
 
     header_content.extend([
         "#ifdef __cplusplus",
@@ -259,7 +287,7 @@ if __name__ == "__main__":
     
     
     app_cfiles = [os.path.join(app_directory, f) for f in os.listdir(app_directory) if f.endswith('.c')]
-    app_functions_list, got_declarations, function_definitions = process_app_files(app_cfiles)
-    write_app_files(output_header_name_b, app_functions_list, got_declarations, function_definitions)
+    app_functions_list, got_declarations, function_definitions, func_names = process_app_files(app_cfiles)
+    write_app_files(output_header_name_b, app_functions_list, got_declarations, function_definitions, func_names)
 
 
