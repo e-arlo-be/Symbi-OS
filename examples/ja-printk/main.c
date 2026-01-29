@@ -32,6 +32,7 @@ int main() {
 
     
     sym_elevate();
+#if 0    
     _printk("hello world\n");
     printf("main: called elevate\n");
     //run kernel_add
@@ -43,15 +44,12 @@ int main() {
     int pid = current_pid();
     printf("printf: current_pid() = %d\n", pid);
     _printk("printk: current_pid() = %d\n", pid);
-
+#endif
 #if 1
-    // run pf_hdlr_addr()
-    uintptr_t  pf = (uintptr_t) pf_hdlr_addr();
-    printf("pf: %" PRIxPTR "\n", pf);
+    pf_adaptor_init();
 #endif
     sym_lower();
-
-    assert(pf == get_exc_page_fault_addr());
+    //   assert(pf == get_exc_page_fault_addr());
     
     printf("DONE\n");
     return 0;

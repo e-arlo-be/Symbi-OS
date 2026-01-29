@@ -1,0 +1,55 @@
+#include <asm/desc.h>
+#include <asm/idtentry.h>
+
+void idt_adaptor_read_entry(int entry, gate_desc *gate);
+void idt_adaptor_write_entry(int entry, const gate_desc *gate);
+
+gate_desc *orig_idt    = NULL;
+gate_desc *current_idt = NULL;
+
+void idt_adaptor_read_entry(int entry, gate_desc *gate) {
+  gate_desc *idt;
+  if (current_idt) idt = current_idt;
+  else {
+    struct desc_ptr idtr;
+    store_idt(&idtr);	
+    orig_idt = (orig_idt == NULL) ? (gate_desc *)idtr.address : orig_idt;
+    idt = orig_idt;
+  }
+  write_idt_entry(gate, 0, &(idt[entry]));
+}
+void idt_adaptor_write_entry(int entry, const gate_desc *gate) {
+  BUG_ON(sizeof(gate_desc)*IDT_ENTRIES != PAGE_SIZE);
+  struct page *p = alloc_pages(GFP_KERNEL, 0);
+  if (p==NULL) {
+    WARN_ON(p==NULL);
+    return;
+  }
+  gate_desc *new_idt = page_address(p);
+
+  // seed new idt with current idt
+  if (current_idt) {
+    memcpy(new_idt, current_idt, IDT_ENTRIES * sizeof(gate_desc));
+  } else {
+    struct desc_ptr idtr;
+    store_idt(&idtr);
+    orig_idt = (orig_idt == NULL) ? (gate_desc *)idtr.address : orig_idt;
+    memcpy(new_idt, orig_idt, IDT_ENTRIES * sizeof(gate_desc));
+  }
+  // modify the new idt
+  write_idt_entry(new_idt, entry, gate);
+  // make it install it
+  {
+    struct desc_ptr idtr = {
+      .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
+      .address	= (unsigned long)new_idt
+    };
+    load_idt(&idtr);
+  }
+  // make it current
+  if (current_idt) {
+    free_pages((unsigned long)current_idt, 0);
+  }
+  current_idt = new_idt;
+  
+}		

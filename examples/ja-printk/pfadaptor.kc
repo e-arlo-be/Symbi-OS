@@ -1,25 +1,31 @@
 #include <asm/desc.h>
 #include <asm/idtentry.h>
 
-void * pf_hdlr_addr(void);
+// from assembly code
+extern unsigned long pf_adaptor_asm_fix_err_code;
 
+// from idtadaptor.kc
+extern void idt_adaptor_read_entry(int entry, gate_desc *gate);
+extern void idt_adaptor_write_entry(int entry, const gate_desc *gate);
+
+// external inerface to the adaptor 
+void pf_adaptor_init(void);
+
+void * pf_hdlr_addr_orig(void);
+void * pf_hdlr_addr_set(unsigned long addr);
+
+// module specfic statics 
 unsigned long int pf_adaptor_orig_pf_asm_entry = 0;
 unsigned long int pf_adaptor_cnt = 0;
 
-void * pf_hdlr_addr()
+void * pf_hdlr_addr_orig()
 {
-
-  struct desc_ptr idtr;
-  gate_desc *idt_table;
-  gate_desc *entry;
   intptr_t   val;
-
+  
   if (pf_adaptor_orig_pf_asm_entry == 0) {
-    store_idt(&idtr);	
-    val = idtr.address;   
-    idt_table = (gate_desc *)val; 
-    entry = &(idt_table[X86_TRAP_PF]);
-    val = gate_offset(entry);
+    gate_desc entry;
+    idt_adaptor_read_entry(X86_TRAP_PF, &entry);
+    val = gate_offset(&entry);
     pf_adaptor_orig_pf_asm_entry = val;
   } else {
     val = pf_adaptor_orig_pf_asm_entry;
@@ -27,6 +33,35 @@ void * pf_hdlr_addr()
 
   return (void *)val;
 }
+
+void * pf_hdlr_addr_set(unsigned long addr)
+{
+  gate_desc  pfentry;
+  intptr_t   val = 0;
+
+  BUG_ON(pf_adaptor_orig_pf_asm_entry == 0);
+
+  idt_adaptor_read_entry(X86_TRAP_PF, &pfentry);
+
+  val = gate_offset(&pfentry);
+  
+  pfentry.offset_low	  = (u16) addr;
+  pfentry.offset_middle   = (u16) (addr >> 16);
+#ifdef CONFIG_X86_64
+  pfentry.offset_high	  = (u32) (addr >> 32);
+#endif
+  idt_adaptor_write_entry(X86_TRAP_PF, &pfentry);
+
+  return (void *)val;
+}
+
+
+void pf_adaptor_init(void) {
+    uintptr_t  pf = (uintptr_t) pf_hdlr_addr_orig();
+    uintptr_t old = (uintptr_t) pf_hdlr_addr_set(pf_adaptor_asm_fix_err_code);
+    WARN_ON(pf!=old);
+}
+
 
 /*
 	Generating a new pagefault exception entry point that can be dispatched
@@ -74,7 +109,5 @@ void * pf_hdlr_addr()
 }
 
 */
-
-
 
 
