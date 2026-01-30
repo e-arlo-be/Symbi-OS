@@ -1,12 +1,57 @@
 #include <asm/desc.h>
 #include <asm/idtentry.h>
 
-void idt_adaptor_read_entry(int entry, gate_desc *gate);
-void idt_adaptor_write_entry(int entry, const gate_desc *gate);
+gate_desc * idt_adaptor_clone(void);
+void        idt_adaptor_activate(const gate_desc *idt);
+void        idt_adaptor_release(const gate_desc *idt);
 
 gate_desc *orig_idt    = NULL;
 gate_desc *current_idt = NULL;
 
+gate_desc * idt_adaptor_clone(void) {
+  struct page *p = alloc_pages(GFP_KERNEL, 0);
+  if (p==NULL) {
+    WARN_ON(p==NULL);
+    return NULL;
+  }
+  gate_desc *new_idt = page_address(p);
+  gate_desc *src_idt;
+  
+  // seed new idt with current idt or orig_idt
+  if (current_idt) {
+    src_idt = current_idt;
+  } else {
+    struct desc_ptr idtr;
+    store_idt(&idtr);
+    orig_idt = (orig_idt == NULL) ? (gate_desc *)idtr.address : orig_idt;
+    src_idt  = orig_idt;
+  }
+  memcpy(new_idt, src_idt, IDT_ENTRIES * sizeof(gate_desc));
+  return new_idt;
+}
+
+void idt_adaptor_activate(const gate_desc *idt) {
+  struct desc_ptr idtr = {
+    .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
+    .address	= (unsigned long)idt
+  };
+  load_idt(&idtr);
+
+  // make it current
+  if (current_idt) {
+    free_pages((unsigned long)current_idt, 0);
+  }
+  // cache pointer as current
+  current_idt = (gate_desc *)idt;
+}
+
+void idt_adaptor_release(const gate_desc *idt) {
+  free_pages((unsigned long)idt, 0);
+}
+
+
+
+#if 0
 void idt_adaptor_read_entry(int entry, gate_desc *gate) {
   gate_desc *idt;
   if (current_idt) idt = current_idt;
@@ -18,6 +63,21 @@ void idt_adaptor_read_entry(int entry, gate_desc *gate) {
   }
   write_idt_entry(gate, 0, &(idt[entry]));
 }
+
+gate_desc * idt_adaptor_new_idt(void)
+{
+}
+
+void idt_adaptor_install_idt(const gate_desc *idt)
+{
+  struct desc_ptr idtr = {
+    .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
+    .address	= (unsigned long)idt
+  };
+  load_idt(&idtr);
+}
+
+
 void idt_adaptor_write_entry(int entry, const gate_desc *gate) {
   BUG_ON(sizeof(gate_desc)*IDT_ENTRIES != PAGE_SIZE);
   struct page *p = alloc_pages(GFP_KERNEL, 0);
@@ -38,7 +98,7 @@ void idt_adaptor_write_entry(int entry, const gate_desc *gate) {
   }
   // modify the new idt
   write_idt_entry(new_idt, entry, gate);
-  // make it install it
+  // install it
   {
     struct desc_ptr idtr = {
       .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
@@ -50,6 +110,8 @@ void idt_adaptor_write_entry(int entry, const gate_desc *gate) {
   if (current_idt) {
     free_pages((unsigned long)current_idt, 0);
   }
+  // cache pointer as current
   current_idt = new_idt;
   
 }		
+#endif

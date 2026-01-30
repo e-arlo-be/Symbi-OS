@@ -2,66 +2,90 @@
 #include <asm/idtentry.h>
 
 // from assembly code
-extern unsigned long pf_adaptor_asm_fix_err_code;
+extern unsigned long pf_adaptor_asm_fix_err_code_u;
+extern unsigned long pf_adaptor_asm_fix_err_code_uw;
 
 // from idtadaptor.kc
-extern void idt_adaptor_read_entry(int entry, gate_desc *gate);
-extern void idt_adaptor_write_entry(int entry, const gate_desc *gate);
+extern gate_desc * idt_adaptor_clone(void);
+extern void        idt_adaptor_activate(gate_desc *idt);
+extern void        idt_adaptor_release(gate_desc *idt);
 
 // external inerface to the adaptor 
-void pf_adaptor_init(void);
+int pf_adaptor_init(intptr_t asm_exc_page_fault,intptr_t asm_exc_double_fault);
 
-void * pf_hdlr_addr_orig(void);
-void * pf_hdlr_addr_set(unsigned long addr);
+// module specfic statics
+unsigned long int pf_adaptor_pf_cnt = 0;
+unsigned long int pf_adaptor_df_cnt = 0;
 
-// module specfic statics 
-unsigned long int pf_adaptor_orig_pf_asm_entry = 0;
-unsigned long int pf_adaptor_cnt = 0;
-
-void * pf_hdlr_addr_orig()
+// think about moving these two to idt_adaptor.kh
+static inline void
+read_gate(gate_desc *idt, int n, gate_desc *gate)
 {
-  intptr_t   val;
-  
-  if (pf_adaptor_orig_pf_asm_entry == 0) {
-    gate_desc entry;
-    idt_adaptor_read_entry(X86_TRAP_PF, &entry);
-    val = gate_offset(&entry);
-    pf_adaptor_orig_pf_asm_entry = val;
+  write_idt_entry(gate, 0, &(idt[n])); 
+}
+
+static inline void
+gate_set_offset(gate_desc *gate, intptr_t addr)
+{
+  gate->offset_low      = (u16) addr;
+  gate->offset_middle   = (u16) (addr >> 16);
+#ifdef CONFIG_X86_64
+  gate->offset_high     = (u32) (addr >> 32);
+#endif
+}
+
+intptr_t pf_adaptor_asm_exc_page_fault = 0;
+int pf_adaptor_init(intptr_t asm_exc_page_fault,
+		    intptr_t asm_exc_double_fault)
+{
+  gate_desc * idt = idt_adaptor_clone();
+  gate_desc   gate;
+  intptr_t    val;
+  bool        dirty = false;
+
+  if (pf_adaptor_asm_exc_page_fault == 0) {
+    pf_adaptor_asm_exc_page_fault = asm_exc_page_fault;
+  }
+  // install our "fix" to pf handler if needed
+  //    modify trap error code to make the fault always look like
+  //    it came from the user mode and invoke original
+  //    system pf handler : see assembly code
+  read_gate(idt, X86_TRAP_PF, &gate);
+  val = gate_offset(&gate);
+  if (val != (intptr_t)asm_exc_page_fault) {
+    if (val != pf_adaptor_asm_fix_err_code_u) {
+      printk("WARNING: unexpected PF handler installed %lx", val); 
+      goto error;
+    } 
   } else {
-    val = pf_adaptor_orig_pf_asm_entry;
+    gate_set_offset(&gate, pf_adaptor_asm_fix_err_code_u);
+    dirty = true;
   }
 
-  return (void *)val;
-}
-
-void * pf_hdlr_addr_set(unsigned long addr)
-{
-  gate_desc  pfentry;
-  intptr_t   val = 0;
-
-  BUG_ON(pf_adaptor_orig_pf_asm_entry == 0);
-
-  idt_adaptor_read_entry(X86_TRAP_PF, &pfentry);
-
-  val = gate_offset(&pfentry);
+  // install our "fix" to df handler of needed
+  //  if we fault when taking a pf a double fault will be triggered
+  //  double faults are handled on an IST (kernel Interrupt stack)
+  //  so we fix error code invoke original system pf handler :
+  //  see assembly code
+  read_gate(idt, X86_TRAP_DF, &gate);
+  val = gate_offset(&gate);
+  if (val != (intptr_t)asm_exc_double_fault) {
+    if (val != pf_adaptor_asm_fix_err_code_uw) {
+            printk("WARNING: unexpected DF handler installed %lx", val); 
+      goto error;
+    }
+  } else {
+    gate_set_offset(&gate, pf_adaptor_asm_fix_err_code_uw);
+    dirty = true;
+  }
   
-  pfentry.offset_low	  = (u16) addr;
-  pfentry.offset_middle   = (u16) (addr >> 16);
-#ifdef CONFIG_X86_64
-  pfentry.offset_high	  = (u32) (addr >> 32);
-#endif
-  idt_adaptor_write_entry(X86_TRAP_PF, &pfentry);
-
-  return (void *)val;
+  if (dirty) idt_adaptor_activate(idt);
+  else       idt_adaptor_release(idt);
+  return 1;
+ error:
+  idt_adaptor_release(idt);
+  return 0;
 }
-
-
-void pf_adaptor_init(void) {
-    uintptr_t  pf = (uintptr_t) pf_hdlr_addr_orig();
-    uintptr_t old = (uintptr_t) pf_hdlr_addr_set(pf_adaptor_asm_fix_err_code);
-    WARN_ON(pf!=old);
-}
-
 
 /*
 	Generating a new pagefault exception entry point that can be dispatched
