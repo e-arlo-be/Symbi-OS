@@ -1,0 +1,33 @@
+#include <linux/pid.h>
+#include "app.h"
+#include <linux/module.h>
+
+#include <asm/fsgsbase.h>
+
+#include <asm/processor.h>
+
+void* get_current_task_struct(void) {
+	return (void*)current;
+}
+
+//function returning current process's pid
+pid_t get_current_pid(void) {
+	return current->pid;
+}
+
+uint64_t get_current_cr3(void) {
+	return read_cr3_pa();
+}
+
+//function returning current cpu id
+int get_current_cpu_id(void) {
+	return smp_processor_id();
+}
+
+unsigned long get_current_gs_base(void) {
+	return rdgsbase();
+}
+
+unsigned int get_current_symbi_state(void) {
+	return current->symbiote_elevated << 1 | current->symbiote_migrated;
+}
