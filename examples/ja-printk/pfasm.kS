@@ -19,7 +19,7 @@ pf_adaptor_asm_fix_err_code_u:
 	// NYI: Add tests to only fix error code if faulting process is elevated and
 	//      address and fault type are sensible.  
 	// x86 allows immediate and memory operands without using a register
-	incq  (pf_adaptor_pf_cnt)
+//	incq  pf_adaptor_pf_cnt
 	orl   $ERRCODE_PF_USER, (%rsp)
 	jmp   *pf_adaptor_asm_exc_page_fault
 	// int3 to satifiy objtool desire for a trap after a speculative jump to try and improve security
@@ -31,7 +31,7 @@ pf_adaptor_asm_fix_err_code_u:
 pf_adaptor_asm_fix_err_code_uw:
 	// used to fix double fault 
 	// x86 allows immediate and memory operands without using a register
-	incq  (pf_adaptor_df_cnt)
+//	incq  (pf_adaptor_df_cnt)
 	orl   $(ERRCODE_PF_USER|ERRCODE_PF_WRITE), (%rsp)
 	jmp   *pf_adaptor_asm_exc_page_fault	
 	// int3 to satifiy objtool desire for a trap after a speculative jump to try and improve security

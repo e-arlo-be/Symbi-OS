@@ -12,10 +12,15 @@ extern void        idt_adaptor_release(gate_desc *idt);
 
 // external inerface to the adaptor 
 int pf_adaptor_init(intptr_t asm_exc_page_fault,intptr_t asm_exc_double_fault);
+unsigned long pf_adaptor_pf_cnt_get(void);
+unsigned long pf_adaptor_df_cnt_get(void);
 
 // module specfic statics
 unsigned long int pf_adaptor_pf_cnt = 0;
 unsigned long int pf_adaptor_df_cnt = 0;
+
+unsigned long int pf_adaptor_pf_cnt_get() { return pf_adaptor_pf_cnt; }
+unsigned long int pf_adaptor_df_cnt_get() { return pf_adaptor_df_cnt; }
 
 // think about moving these two to idt_adaptor.kh
 static inline void

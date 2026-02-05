@@ -10,7 +10,7 @@
 #include "L1/stack_switch.h"
 
 static int module_loaded = 0;
-static int verbose       = 0;
+static int verbose       = 1;
 
 extern unsigned long kallsyms_lookup_name(const char *name);
 
@@ -65,6 +65,8 @@ force_symres_now()
   // lookup symbols to avoid problems once elevated -- touch symbol tables
   if (!resolve_sym("__x64_sys_init_module", &value)) return 0;
   if (!resolve_sym("cpu_current_top_of_stack", &value)) return 0;
+  if (!resolve_sym("kallsyms_lookup_name", &value)) return 0;
+  
   return 1;
 }
 
@@ -112,7 +114,7 @@ void* dpld_resolver(char* symbol_name) {
     rc = load_ext_module();
     if (rc != 0) {
       VPRINTF("Failed to load ext module: %d\n", rc);
-      exit(1);
+      //      exit(1);
     }
     VPRINTF("Loaded kallsyms module\n");
     
