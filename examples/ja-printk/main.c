@@ -39,7 +39,6 @@ int main() {
     printf("pfaddr=0x%lx dfaddr=0x%lx\n", pfaddr, dfaddr);
 
     sym_elevate();
-    pf_adaptor_init(pfaddr, dfaddr);
     _printk("hello world\n");
     printf("main: called elevate\n");
     //run kernel_add

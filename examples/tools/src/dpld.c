@@ -26,7 +26,8 @@ extern const uint8_t _binary_ext_ko_size;
 extern int __x64_sys_init_module(void* args);
 
 //__x64_sys_init_module expects the arguments to be on the stack
-void do_load_module(void* umod, unsigned long len, char* uargs, int* ret_out) {
+void do_load_module(void* umod, unsigned long len, char* uargs, intptr_t pfaddr, intptr_t dfaddr,
+		    int* ret_out) {
     //prepare argument passing
     // mov    0x60(%rdi),%rdx
     // mov    0x68(%rdi),%rsi
@@ -40,6 +41,12 @@ void do_load_module(void* umod, unsigned long len, char* uargs, int* ret_out) {
     int ret = __x64_sys_init_module((void*)(args) - 0x60);
     if (ret_out) {
         *ret_out = ret;
+    }
+    {
+      int (*func)(intptr_t, intptr_t);
+      func = (void *)kallsyms_lookup_name("pf_adaptor_init");
+      // page fault adaptor to ensure faults to
+      func(pfaddr, dfaddr);
     }
 }
 
@@ -66,7 +73,6 @@ force_symres_now()
   if (!resolve_sym("__x64_sys_init_module", &value)) return 0;
   if (!resolve_sym("cpu_current_top_of_stack", &value)) return 0;
   if (!resolve_sym("kallsyms_lookup_name", &value)) return 0;
-  
   return 1;
 }
 
@@ -80,21 +86,38 @@ int load_ext_module() {
   
   if (force_symres_now()==0) {
     fprintf(stderr, "ERROR: failed to resolve symbols needed\n");
+    assert(0);
     return 0;
   }
+  
   if (!resolve_sym("cpu_current_top_of_stack", (void **)&ktos)) {
-    VPRINTF("failed to resolve cpu_current_top_of_stack\n"); 
+    VPRINTF("failed to resolve cpu_current_top_of_stack\n");
+    assert(0);
+    return 0;
   }
   
-  VPRINTF("ktos=%lx\n", ktos);
+  intptr_t  pfaddr;
+  if (!resolve_sym("asm_exc_page_fault", (void **)&pfaddr)) {
+    VPRINTF("failed to resolve asm_exc_page_fault\n");
+    assert(0);
+    return 0;
+  }
+  intptr_t  dfaddr;
+  if (!resolve_sym("asm_exc_double_fault", (void **)&dfaddr)) {
+    VPRINTF("failed to resolve asm_exc_double_fault\n");
+    assert(0);
+    return 0;
+  }
+  
+  VPRINTF("ktos=%lx pfaddr=%lx dfaddr=%lx\n", ktos, pfaddr, dfaddr);
   
   VPRINTF("starting load_module\n");
   
   VPRINTF("do_load_module: umod=%p len=%lu uargs=%p\n", uargs, size, uargs);
   
-  SYM_ON_KERN_STACK_DYNSYM_DO(ktos,
+  SYM_ON_KERN_STACK_DYNSYM_DO(ktos, 
 			      do_load_module((void*)_binary_ext_ko_start,
-					     size, uargs, &ret));
+					     size, uargs, pfaddr, dfaddr, &ret));
   
   VPRINTF("do_load_module: exited __x64_sys_init_module ret=%d\n", ret);
   

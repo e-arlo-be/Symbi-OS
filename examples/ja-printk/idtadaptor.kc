@@ -5,10 +5,10 @@ gate_desc * idt_adaptor_clone(void);
 void        idt_adaptor_activate(const gate_desc *idt);
 void        idt_adaptor_release(const gate_desc *idt);
 
-gate_desc *orig_idt    = NULL;
-gate_desc *current_idt = NULL;
+void *orig_idt    = NULL;
+void *current_idt = NULL;
 
-gate_desc * idt_adaptor_clone(void) {
+void * idt_adaptor_clone(void) {
   struct page *p = alloc_pages(GFP_KERNEL, 0);
   if (p==NULL) {
     WARN_ON(p==NULL);
@@ -30,7 +30,7 @@ gate_desc * idt_adaptor_clone(void) {
   return new_idt;
 }
 
-void idt_adaptor_activate(const gate_desc *idt) {
+void idt_adaptor_activate(const void *idt) {
   struct desc_ptr idtr = {
     .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
     .address	= (unsigned long)idt
@@ -45,73 +45,7 @@ void idt_adaptor_activate(const gate_desc *idt) {
   current_idt = (gate_desc *)idt;
 }
 
-void idt_adaptor_release(const gate_desc *idt) {
+void idt_adaptor_release(const void *idt) {
   free_pages((unsigned long)idt, 0);
 }
 
-
-
-#if 0
-void idt_adaptor_read_entry(int entry, gate_desc *gate) {
-  gate_desc *idt;
-  if (current_idt) idt = current_idt;
-  else {
-    struct desc_ptr idtr;
-    store_idt(&idtr);	
-    orig_idt = (orig_idt == NULL) ? (gate_desc *)idtr.address : orig_idt;
-    idt = orig_idt;
-  }
-  write_idt_entry(gate, 0, &(idt[entry]));
-}
-
-gate_desc * idt_adaptor_new_idt(void)
-{
-}
-
-void idt_adaptor_install_idt(const gate_desc *idt)
-{
-  struct desc_ptr idtr = {
-    .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
-    .address	= (unsigned long)idt
-  };
-  load_idt(&idtr);
-}
-
-
-void idt_adaptor_write_entry(int entry, const gate_desc *gate) {
-  BUG_ON(sizeof(gate_desc)*IDT_ENTRIES != PAGE_SIZE);
-  struct page *p = alloc_pages(GFP_KERNEL, 0);
-  if (p==NULL) {
-    WARN_ON(p==NULL);
-    return;
-  }
-  gate_desc *new_idt = page_address(p);
-
-  // seed new idt with current idt
-  if (current_idt) {
-    memcpy(new_idt, current_idt, IDT_ENTRIES * sizeof(gate_desc));
-  } else {
-    struct desc_ptr idtr;
-    store_idt(&idtr);
-    orig_idt = (orig_idt == NULL) ? (gate_desc *)idtr.address : orig_idt;
-    memcpy(new_idt, orig_idt, IDT_ENTRIES * sizeof(gate_desc));
-  }
-  // modify the new idt
-  write_idt_entry(new_idt, entry, gate);
-  // install it
-  {
-    struct desc_ptr idtr = {
-      .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
-      .address	= (unsigned long)new_idt
-    };
-    load_idt(&idtr);
-  }
-  // make it current
-  if (current_idt) {
-    free_pages((unsigned long)current_idt, 0);
-  }
-  // cache pointer as current
-  current_idt = new_idt;
-  
-}		
-#endif
