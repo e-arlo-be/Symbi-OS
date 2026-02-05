@@ -14,6 +14,8 @@ static inline uintptr_t get_exc_page_fault_addr()
   uintptr_t val;
 
   val = (uintptr_t)dlsym(RTLD_DEFAULT, "asm_exc_page_fault");
+
+
 #if 0
   __asm__ volatile (
 		    "mov exc_page_fault, %0"
@@ -30,8 +32,13 @@ int main() {
 
     printf("main: calling elevate: %p \n", _printk_ptr);
 
-    
+    intptr_t  pfaddr  = (intptr_t)dlsym(RTLD_DEFAULT, "asm_exc_page_fault");
+    intptr_t  dfaddr  = (intptr_t)dlsym(RTLD_DEFAULT, "asm_exc_double_fault");
+
+    printf("pfaddr=0x%lx dfaddr=0x%lx\n", pfaddr, dfaddr);
+
     sym_elevate();
+#if 0    
     _printk("hello world\n");
     printf("main: called elevate\n");
     //run kernel_add
@@ -43,15 +50,12 @@ int main() {
     int pid = current_pid();
     printf("printf: current_pid() = %d\n", pid);
     _printk("printk: current_pid() = %d\n", pid);
-
+#endif
 #if 1
-    // run pf_hdlr_addr()
-    uintptr_t  pf = (uintptr_t) pf_hdlr_addr();
-    printf("pf: %" PRIxPTR "\n", pf);
+    pf_adaptor_init(pfaddr, dfaddr);
 #endif
     sym_lower();
-
-    assert(pf == get_exc_page_fault_addr());
+    //   assert(pf == get_exc_page_fault_addr());
     
     printf("DONE\n");
     return 0;
