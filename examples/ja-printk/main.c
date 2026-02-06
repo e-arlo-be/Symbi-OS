@@ -29,7 +29,8 @@ static inline uintptr_t get_exc_page_fault_addr()
 int main() {
     volatile void * _printk_ptr;
     _printk_ptr = (void *)_printk;
-
+    unsigned long df_cnt, pf_cnt;
+    
     printf("main: calling elevate: %p \n", _printk_ptr);
 
     intptr_t  pfaddr  = (intptr_t)dlsym(RTLD_DEFAULT, "asm_exc_page_fault");
@@ -38,7 +39,6 @@ int main() {
     printf("pfaddr=0x%lx dfaddr=0x%lx\n", pfaddr, dfaddr);
 
     sym_elevate();
-#if 0    
     _printk("hello world\n");
     printf("main: called elevate\n");
     //run kernel_add
@@ -50,12 +50,14 @@ int main() {
     int pid = current_pid();
     printf("printf: current_pid() = %d\n", pid);
     _printk("printk: current_pid() = %d\n", pid);
-#endif
-#if 1
-    pf_adaptor_init(pfaddr, dfaddr);
-#endif
+
+    pf_cnt = pf_adaptor_pf_cnt_get();
+    df_cnt = pf_adaptor_df_cnt_get();
+    
     sym_lower();
     //   assert(pf == get_exc_page_fault_addr());
+
+    printf("pf_cnt=%ld df_cnt=%ld\n", pf_cnt, df_cnt);
     
     printf("DONE\n");
     return 0;
