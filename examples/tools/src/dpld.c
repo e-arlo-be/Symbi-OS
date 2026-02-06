@@ -71,6 +71,9 @@ force_symres_now()
   // lookup symbols to avoid problems once elevated -- touch symbol tables
   if (!resolve_sym("__x64_sys_init_module", &value)) return 0;
   if (!resolve_sym("cpu_current_top_of_stack", &value)) return 0;
+  if (!resolve_sym("kallsyms_lookup_name", &value)) return 0;
+  if (!resolve_sym("vmalloc_noprof", &value)) return 0;
+  if (!resolve_sym("exit", &value)) return 0; //does this go through the GOT?
   return 1;
 }
 
@@ -120,7 +123,8 @@ void* dpld_resolver(char* symbol_name) {
       exit(1);
     }
     VPRINTF("Loaded kallsyms module\n");
-
+    
+    #ifndef NO_APP_GOT_ENTRIES
     sym_elevate();
     set_app_got = (void (*)(app_got_t *))kallsyms_lookup_name("set_app_got");;
     if (!set_app_got) {
@@ -137,6 +141,9 @@ void* dpld_resolver(char* symbol_name) {
     set_app_got(app_got);
     VPRINTF("Set app got pointer in extension\n");
     sym_lower();
+    #else
+    VPRINTF("No GOT entries to set, skipping GOT setup\n");
+    #endif
     
     
     module_loaded = 1;

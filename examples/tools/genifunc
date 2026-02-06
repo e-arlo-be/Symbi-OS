@@ -210,6 +210,10 @@ def write_app_files(header_filename, func_protos, got_declarations, function_def
         "#endif"
     ]
 
+    if not got_declarations:
+        got_declarations.append("void* dummy; // No GOT entries found, dummy entry to avoid empty struct")
+        header_content.append("#define NO_APP_GOT_ENTRIES")
+
     if got_declarations:
         header_content.append("typedef struct {")
         header_content.append("// GOT Declarations")
@@ -245,6 +249,10 @@ def write_app_files(header_filename, func_protos, got_declarations, function_def
         header_content.append("")
         header_content.append("#endif")
         header_content.append("")
+    
+    else:
+        # noop macro
+        header_content.append("#define SET_ALL_GOT_ENTRIES() // No functions found, no GOT entries to set")
 
     header_content.extend([
         "#ifdef __cplusplus",
