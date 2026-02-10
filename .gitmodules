@@ -14,7 +14,8 @@
 	url = git@github.com:unikernelLinux/new_lebench.git
 [submodule "redis"]
 	path = redis
-	url = git@github.com:Symbi-OS/redis.git
+	url = git@github.com:F-Wilke/redis.git
+	branch = ukl-df-shortcut
 [submodule "symVirtNetPollBinHack"]
 	path = symVirtNetPollBinHack
 	url = git@github.com:Symbi-OS/symVirtNetPollBinHack.git
