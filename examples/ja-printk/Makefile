@@ -34,6 +34,4 @@ main_static: main.o libkallsyms.a libextension.a
 	$(CC) $(CFLAGS) -o $@ $^  libkallsyms.a libextension.a -lc -L../../Symlib/dynam_build -lSym  
 
 clean:
-	rm -rf $(wildcard $(TARGETS) *.o *.so *.a ext.kbin  extension.h .ext)
-
-
+	rm -rf $(wildcard $(TARGETS) *.o *.so *.a extension.c ext.kbin app.h .ext)

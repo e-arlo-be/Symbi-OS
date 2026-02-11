@@ -10,6 +10,7 @@
 #include <linux/pid.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/smp.h>
 
 
 void df_jmp_to_c(void);
@@ -99,7 +100,12 @@ void set_idt_entry(struct idt_entry *idt, int vector, void *handler_addr) {
     idt[vector].offset2 = (offset >> 32) & 0xFFFFFFFF;
 }
 
-
+// Function to load IDT on a single CPU
+void load_idt_on_cpu(void *info) {
+    struct dtr *idtr = (struct dtr *)info;
+    asm volatile ("lidt %0" : : "m" (*idtr));
+    printk("Loaded new IDT on CPU %d\n", smp_processor_id());
+}
 
 void setup_df_interposition(void) {
     struct idt_entry *new_idt = duplicate_idt();
@@ -125,11 +131,14 @@ void setup_df_interposition(void) {
     printk("Modified DB handler to point to %016llx\n", (unsigned long long)new_db_handler_addr);
     
 
-    // Load the new IDT
+    // Load the new IDT on all CPUs
     struct dtr new_idtr;
     new_idtr.base = (uint64_t)new_idt;
     new_idtr.limit = sizeof(struct idt_entry) * 256 - 1;
-    asm volatile ("lidt %0" : : "m" (new_idtr));
+    
+    // Execute load_idt_on_cpu on all CPUs
+    on_each_cpu(load_idt_on_cpu, &new_idtr, 1);
+    printk("Loaded new IDT on all CPUs\n");
 }
 
 

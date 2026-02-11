@@ -4,3 +4,5 @@ extension.h
 *.so
 *.o
 .ext/*
+app.h
+extension.c

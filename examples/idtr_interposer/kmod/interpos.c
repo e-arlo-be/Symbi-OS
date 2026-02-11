@@ -24,9 +24,9 @@ __attribute((unused)) void tf_c_entry(struct pt_regs *pt_r){
   /* tu_printk(str); */
 
 
-  if(pt_r->orig_ax & WR_FT){
-    return;
-  }
+  // if(pt_r->orig_ax & WR_FT){
+  //   return;
+  // }
 
   pt_r->orig_ax |= USER_FT;
 
