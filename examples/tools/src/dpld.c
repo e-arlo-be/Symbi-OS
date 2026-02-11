@@ -32,7 +32,7 @@ extern const uint8_t _binary_ext_ko_size;
 extern int __x64_sys_init_module(void* args);
 
 //__x64_sys_init_module expects the arguments to be on the stack
-void do_load_module(void* umod, unsigned long len, char* uargs, intptr_t pfaddr, intptr_t dfaddr,
+void do_load_module(void* umod, unsigned long len, char* uargs, unsigned long pfaddr, unsigned long dfaddr,
 		    int* ret_out) {
     //prepare argument passing
     // mov    0x60(%rdi),%rdx
@@ -49,7 +49,7 @@ void do_load_module(void* umod, unsigned long len, char* uargs, intptr_t pfaddr,
         *ret_out = ret;
     }
     {
-      int (*func)(intptr_t, intptr_t);
+      int (*func)(unsigned long, unsigned long);
       func = (void *)kallsyms_lookup_name("pf_adaptor_init");
       // page fault adaptor to ensure faults to
       func(pfaddr, dfaddr);
@@ -104,13 +104,13 @@ int load_ext_module() {
     return 0;
   }
   
-  intptr_t  pfaddr;
+  unsigned long pfaddr;
   if (!resolve_sym("asm_exc_page_fault", (void **)&pfaddr)) {
     VPRINTF("failed to resolve asm_exc_page_fault\n");
     assert(0);
     return 0;
   }
-  intptr_t  dfaddr;
+  unsigned long dfaddr;
   if (!resolve_sym("asm_exc_double_fault", (void **)&dfaddr)) {
     VPRINTF("failed to resolve asm_exc_double_fault\n");
     assert(0);

@@ -9,27 +9,49 @@ import os
 # --- (Optional) Manual configuration if libclang is not found automatically ---
 # clang.cindex.Config.set_library_file('/usr/lib/llvm-14/lib/libclang.so') 
 
-def get_function_prototype_ifunc(cursor):
+def get_function_prototype_ifunc(tu, cursor):
     """Extracts the full function prototype string for a declaration."""
-    return_type = cursor.result_type.spelling
-    func_name = cursor.spelling
-    params = []
-    for child in cursor.get_children():
-        if child.kind == clang.cindex.CursorKind.PARM_DECL:
-            param_type = child.type.spelling
-            param_name = child.spelling
-            params.append(f"{param_type} {param_name}")
+    # Only process declarations in the specific input file
+    print(cursor.kind, cursor.linkage, cursor.spelling);
+    range_start = cursor.extent.start
+    range_end = cursor.extent.end
+    rettype_tokens   = []
+    parms_tokens     = []
+    signature_tokens = []
+    count = 0
+    name = -1
+    for token in tu.get_tokens(extent=cursor.extent):
+        signature_tokens.append(token.spelling)
+        if token.spelling == cursor.spelling:
+            name = count
+            print(signature_tokens[name])
+        elif name == -1:
+            rettype_tokens.append(token.spelling)
+        else:
+            parms_tokens.append(token.spelling)
+            count=count + 1
+    if count != -1:  
+        # Join the tokens to reconstruct the signature string
+        # We remove the last token, the '{', to get just the declaration part
+        rettype = " ".join(rettype_tokens).strip() if rettype_tokens else 'void'
+        parms   = " ".join(parms_tokens).strip() if parms_tokens else 'void'
+        parms   = parms[2:-2]
+        parms   = parms.replace(' ,', ',')
+        func    = cursor.spelling
+        print("rettype:", rettype)
+        print("name:", func)
+        print("parms:", parms)
+        return f"extern {rettype} {func}{parms};", f"DECLARE_IFUNC({func}, {rettype}, ({parms}))"
+    else:
+        return None,None
     
-    params_str = ', '.join(params) if params else 'void'
-    return func_name, f"extern {return_type} {func_name}({params_str});", f"DECLARE_IFUNC({func_name}, {return_type}, ({params_str}))", f"    void* {func_name};", f"DEFINE_GOT_FUNC({func_name}, {return_type}, ({params_str}))"
-
 def get_global_variable_declaration(cursor):
     """Extracts the declaration string for a global variable."""
     var_name = cursor.spelling
     var_type = cursor.type.spelling
     return f"extern {var_type} {var_name};"
 
-def process_ext_files(source_filenames):
+def process_files(source_filenames):
     """
     Processes multiple C files and aggregates declarations.
     """
@@ -42,7 +64,9 @@ def process_ext_files(source_filenames):
 
     for source_filename in source_filenames:
         print(f"Parsing {source_filename}...")
-        tu = index.parse(source_filename, args=['-std=c99'])
+        # optionally add -nostdinc
+        tu = index.parse(source_filename, args=['-nostdinc','-x', 'c', '-std=c99'],
+                         options=clang.cindex.TranslationUnit.PARSE_INCOMPLETE)
         
         if not tu:
             print(f"Error: Unable to parse translation unit for {source_filename}. Skipping.")
@@ -53,12 +77,11 @@ def process_ext_files(source_filenames):
             if cursor.location.file and os.path.abspath(cursor.location.file.name) != os.path.abspath(source_filename):
                 continue
 
-            #dont include static ones
-            if cursor.linkage == clang.cindex.LinkageKind.INTERNAL:
-                continue
-
-            if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL and cursor.is_definition():
-                _, prototype,ifunc,_,_ = get_function_prototype_ifunc(cursor)
+            if (cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL and
+                cursor.linkage == clang.cindex.LinkageKind.EXTERNAL and
+                not cursor.is_definition()):
+                prototype,ifunc = get_function_prototype_ifunc(tu, cursor)
+                print("proto: ", prototype);
                 if prototype:
                     all_function_prototypes.add(prototype)
                 if ifunc:
@@ -73,71 +96,8 @@ def process_ext_files(source_filenames):
                         
     return sorted(list(all_global_variables)), sorted(list(all_function_prototypes)), sorted(list(all_ifuncs))
 
-def process_app_files(source_filenames):
-    """
-    Processes multiple C files and aggregates function prototypes and GOT declarations.
-    """
-    index = clang.cindex.Index.create()
-    all_function_prototypes = set() # Use a set to avoid duplicate declarations
-    got_declarations = set()
-    function_definitions = set()
-    got_derefs = set()
-    func_names = set()
-
-    for source_filename in source_filenames:
-        print(f"Parsing {source_filename}...")
-        tu = index.parse(source_filename, args=['-std=c99'])
-        
-        if not tu:
-            print(f"Error: Unable to parse translation unit for {source_filename}. Skipping.")
-            continue
-
-        for cursor in tu.cursor.get_children():
-            # Only consider declarations belonging to the current source file being parsed
-            if cursor.location.file and os.path.abspath(cursor.location.file.name) != os.path.abspath(source_filename):
-                continue
-
-            #dont include static ones
-            if cursor.linkage == clang.cindex.LinkageKind.INTERNAL:
-                continue
-
-
-            if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL and cursor.is_definition():
-                func_name, prototype, _, got_declaration, function_definition = get_function_prototype_ifunc(cursor)
-                if func_name == "main":
-                    continue  # Skip main function
-                func_names.add(func_name)
-
-
-                if prototype:
-                    all_function_prototypes.add(prototype)
-                if got_declaration:
-                    got_declarations.add(got_declaration)
-                if function_definition:
-                    function_definitions.add(function_definition)
-                    
-            elif cursor.kind == clang.cindex.CursorKind.VAR_DECL:
-                continue # We can not link to global variables from the application because of the kernels memory model (32 bit relative addressing)
-
-
-    return sorted(list(all_function_prototypes)), sorted(list(got_declarations)), sorted(list(function_definitions)), sorted(list(func_names))
-
-
-
-def write_ext_files(header_filename, c_filename, global_vars, func_protos, ifuncs):
-    """Writes the aggregated declarations to a single header file."""
-    include_guard = os.path.basename(header_filename).replace('.', '_').upper() + "_"
-    header_content = [
-        f"#ifndef {include_guard}",
-        f"#define {include_guard}",
-        "",
-        "#ifdef __cplusplus",
-        "extern \"C\" {",
-        "#endif",
-        "#include \"app.h\"",
-        ""
-    ]
-
+def write_files(c_filename, global_vars, func_protos, ifuncs):
+    """Writes the ifuncs to a single source file."""
     c_content = [
         "extern void *dpld_resolver(char * symbol_name);",
         "",
@@ -151,36 +111,15 @@ def write_ext_files(header_filename, c_filename, global_vars, func_protos, ifunc
         ""
     ]
     
-    if global_vars:
-        header_content.append("// Global Data Symbols")
-        header_content.extend(global_vars)
-        header_content.append("")
-
-    if func_protos:
-        header_content.append("// Function Prototypes")
-        header_content.extend(func_protos)
-        header_content.append("")
-
     if ifuncs:
         c_content.append("// generate ifunc for ext function found");
         c_content.extend(ifuncs)
         c_content.append("");
         
-    header_content.extend([
-        "#ifdef __cplusplus",
-        "}",
-        "#endif",
-        "",
-        f"#endif // {include_guard}"
-    ])
-
-    with open(header_filename, 'w') as f:
-        f.write('\n'.join(header_content))
-
     with open(c_filename, 'w') as f:
         f.write('\n'.join(c_content))
         
-    print(f"\nSuccessfully generated: {header_filename} {c_filename}")
+    print(f"\nSuccessfully generated: {c_filename}")
 
 def write_app_files(header_filename, func_protos, got_declarations, function_definitions, func_names):
     """Writes the app file with function prototypes and GOT declarations."""
@@ -273,29 +212,18 @@ def write_app_files(header_filename, func_protos, got_declarations, function_def
 if __name__ == "__main__":
     # sys.argv[0] is the script name, sys.argv[1:] is the list of source files
 
-    if len(sys.argv) < 6:
-        print(f"Usage: {sys.argv[0]} <outputA.h> <outputA.c> <outputB.h> <app_directory> <file1.c> [file2.c ...]")
+    if len(sys.argv) < 3:
+        print(f"Usage: {sys.argv[0]} <output.c> <file1.h> [file2.h ...]")
         sys.exit(1)
     
-    output_header_name = sys.argv[1]
-    output_c_name = sys.argv[2]
-    output_header_name_b = sys.argv[3]
-    app_directory = sys.argv[4]
-    source_files = sys.argv[5:]
+    output_c_name = sys.argv[1]
+    source_files = sys.argv[2:]
 
-    # Filter to ensure only .c files are processed (optional safety check)
-    c_files = [f for f in source_files if f.endswith('.c')]
-    if not c_files:
-        print("Error: No valid .c files provided for processing.")
+    # Filter to ensure only .kh files are processed (optional safety check)
+    kh_files = [f for f in source_files if f.endswith('.kh')]
+    if not kh_files:
+        print("Error: No valid .kh files provided for processing.")
         sys.exit(1)
-
-
-    globals_list, functions_list, ifunc_list = process_ext_files(c_files)
-    write_ext_files(output_header_name, output_c_name, globals_list, functions_list, ifunc_list)
-    
-    
-    app_cfiles = [os.path.join(app_directory, f) for f in os.listdir(app_directory) if f.endswith('.c')]
-    app_functions_list, got_declarations, function_definitions, func_names = process_app_files(app_cfiles)
-    write_app_files(output_header_name_b, app_functions_list, got_declarations, function_definitions, func_names)
-
-
+            
+    globals_list, functions_list, ifunc_list = process_files(kh_files)
+    write_files(output_c_name, globals_list, functions_list, ifunc_list)

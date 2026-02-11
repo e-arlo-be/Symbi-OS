@@ -1,19 +1,20 @@
 #include <stdio.h>
 #include <string.h>
 #include "L0/sym_lib.h"
-#include "extension.h"
 #include <dlfcn.h>
 #include <assert.h>
 #include <inttypes.h>
+#include "greeter.kh"
+#include "pfadaptor.kh"
 
 //native kernel function that will be resolved at load time
 extern int _printk(const char *fmt, ...);
 
-static inline uintptr_t get_exc_page_fault_addr()
+static inline unsigned long get_exc_page_fault_addr()
 {
-  uintptr_t val;
+  unsigned long val;
 
-  val = (uintptr_t)dlsym(RTLD_DEFAULT, "asm_exc_page_fault");
+  val = (unsigned long)dlsym(RTLD_DEFAULT, "asm_exc_page_fault");
 
 
 #if 0
@@ -26,6 +27,8 @@ static inline uintptr_t get_exc_page_fault_addr()
   return val;
 }
 
+extern int overflowuid;
+
 int main() {
     volatile void * _printk_ptr;
     _printk_ptr = (void *)_printk;
@@ -33,6 +36,8 @@ int main() {
     
     printf("main: calling elevate: %p \n", _printk_ptr);
 
+    printf("overflowuid=%p\n", &overflowuid);
+    
     intptr_t  pfaddr  = (intptr_t)dlsym(RTLD_DEFAULT, "asm_exc_page_fault");
     intptr_t  dfaddr  = (intptr_t)dlsym(RTLD_DEFAULT, "asm_exc_double_fault");
 

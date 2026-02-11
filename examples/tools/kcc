@@ -67,11 +67,11 @@ name=${target%.kbin}
 if (( $# > 0 )); then
     src=( $@ )
 else
-    src=( $(find $PWD -maxdepth 1 -name '*.kc' -o  -name '*.kS') )
+    src=( $(find $PWD -maxdepth 1 -name '*.kc' -o -name '*.kh' -o  -name '*.kS') )
 fi
 
 (( ! ${#src[@]} ))  && {
-    echo "No .kc or .kS source files" > /dev/stderr
+    echo "No .kc, .kh or .kS source files" > /dev/stderr
     exit -1
 }
 
@@ -86,6 +86,9 @@ for s in ${src[@]}; do
     if [[ $s =~ \.kc$ ]]; then 
 	t=$(basename ${s%.kc}.c)
 	cfiles+=($t)
+    elif [[ $s =~ \.kh$ ]]; then
+	t=$(basename ${s})
+	hfiles+=($t)
     else
 	t=$(basename ${s%.kS}.S)
 	asmfiles+=($t)
@@ -165,12 +168,12 @@ dpld.o: dpld.c extension.h app.h
 extension.o: extension.c extension.h app.h
 	gcc -c -o \$@ \$<
 
-extension.c extension.h app.h: ${cfiles[@]}
-	$scriptdir/genifunc extension.h \$@ app.h .. \$^
+extension.c: ${hfiles[@]}
+	$scriptdir/genifunc \$@ \$^
 
 clean:
 	make -C ${LINUX_BUILD_PATH} M=${tmpdir} clean
-	-rm -rf \$(wildcard *.o extension.c extension.h libextension.a ext.ko ext.bin )
+	-rm -rf \$(wildcard *.o extension.c libextension.a ext.ko ext.bin )
 
 EOF
 
