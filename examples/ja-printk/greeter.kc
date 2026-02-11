@@ -1,9 +1,6 @@
 #include <linux/pid.h>
 #include <greeter.kh>
 
-int current_pid(void);
-int kernel_add(int a, int b);
-
 //some example functions
 int current_pid(void) {
 	return current->pid;

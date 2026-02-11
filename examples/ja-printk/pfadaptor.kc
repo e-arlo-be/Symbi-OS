@@ -1,19 +1,11 @@
 #include <asm/desc.h>
 #include <asm/idtentry.h>
+#include "idtadaptor.h"
+#include "pfadaptor.kh"
 
 // from assembly code
 extern unsigned long pf_adaptor_asm_fix_err_code_u;
 extern unsigned long pf_adaptor_asm_fix_err_code_uw;
-
-// from idtadaptor.kc
-extern void * idt_adaptor_clone(void);
-extern void        idt_adaptor_activate(void *idt);
-extern void        idt_adaptor_release(void *idt);
-
-// external inerface to the adaptor 
-int pf_adaptor_init(unsigned long asm_exc_page_fault, unsigned long asm_exc_double_fault);
-unsigned long pf_adaptor_pf_cnt_get(void);
-unsigned long pf_adaptor_df_cnt_get(void);
 
 // module specfic statics
 unsigned long int pf_adaptor_pf_cnt = 0;

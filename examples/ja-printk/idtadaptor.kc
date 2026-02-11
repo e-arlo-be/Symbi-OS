@@ -1,14 +1,11 @@
 #include <asm/desc.h>
 #include <asm/idtentry.h>
+#include "idtadaptor.h"
 
-gate_desc * idt_adaptor_clone(void);
-void        idt_adaptor_activate(const gate_desc *idt);
-void        idt_adaptor_release(const gate_desc *idt);
+gate_desc *orig_idt    = NULL;
+gate_desc *current_idt = NULL;
 
-void *orig_idt    = NULL;
-void *current_idt = NULL;
-
-void * idt_adaptor_clone(void) {
+gate_desc * idt_adaptor_clone(void) {
   struct page *p = alloc_pages(GFP_KERNEL, 0);
   if (p==NULL) {
     WARN_ON(p==NULL);
@@ -30,7 +27,7 @@ void * idt_adaptor_clone(void) {
   return new_idt;
 }
 
-void idt_adaptor_activate(const void *idt) {
+void idt_adaptor_activate(const gate_desc *idt) {
   struct desc_ptr idtr = {
     .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
     .address	= (unsigned long)idt
@@ -45,7 +42,6 @@ void idt_adaptor_activate(const void *idt) {
   current_idt = (gate_desc *)idt;
 }
 
-void idt_adaptor_release(const void *idt) {
+void idt_adaptor_release(const gate_desc *idt) {
   free_pages((unsigned long)idt, 0);
 }
-

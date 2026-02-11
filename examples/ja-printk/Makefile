@@ -12,7 +12,7 @@ TARGETS :=  main main_static
 all: $(TARGETS)
 
 # extension boiler plate
-libextension.a extension.h ext.kbin: $(wildcard *.kc *.kh)
+libextension.a ext.kbin: $(wildcard *.kc *.kh)
 	../tools/kcc
 
 libkallsyms.so:
@@ -22,7 +22,7 @@ libkallsyms.a:
 	cp /proc/$@ $@
 
 # main program
-main.o: main.c extension.h 
+main.o: main.c 
 	$(CC) $(CFLAGS) -c -o main.o main.c
 
 main:  main.o libextension.a libkallsyms.so
@@ -34,6 +34,6 @@ main_static: main.o libkallsyms.a libextension.a
 	$(CC) $(CFLAGS) -o $@ $^  libkallsyms.a libextension.a -lc -L../../Symlib/dynam_build -lSym  
 
 clean:
-	rm -rf $(wildcard $(TARGETS) *.o *.so *.a ext.kbin  extension.h .ext)
+	rm -rf $(wildcard $(TARGETS) *.o *.so *.a ext.kbin .ext)
 
 
