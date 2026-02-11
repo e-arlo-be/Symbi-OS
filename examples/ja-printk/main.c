@@ -10,6 +10,11 @@
 //native kernel function that will be resolved at load time
 extern int _printk(const char *fmt, ...);
 
+
+void back_linkage_example(void) {
+    printf("This is a back linkage example.\n");
+}
+
 static inline unsigned long get_exc_page_fault_addr()
 {
   unsigned long val;

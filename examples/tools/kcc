@@ -83,6 +83,14 @@ for s in ${src[@]}; do
 	echo "Can't find $s" > /dev/stderr
 	continue
     }
+    
+	# app.kh needs special treatment. It needs to be referenced by a symlink "app_orig.h" in the tmpdir.
+    # a generated app.h then includes app_orig.h and defines the GOT based jumps to application code.
+    if [[ $s == *app.kh ]]; then
+    [[ ! -a $tmpdir/app_orig.h ]] && ln -s $s $tmpdir/app_orig.h
+    continue
+    fi
+
     if [[ $s =~ \.kc$ ]]; then 
 	t=$(basename ${s%.kc}.c)
 	cfiles+=($t)
@@ -93,14 +101,18 @@ for s in ${src[@]}; do
 	t=$(basename ${s%.kS}.S)
 	asmfiles+=($t)
     fi
+
     [[ ! -a $tmpdir/$t ]] && ln -s $s $tmpdir/$t
 done
 
+#we also need extension.h in the tmpdir to generate libextension.a
+[[ ! -a $tmpdir/extension.h ]] && ln -s $PWD/extension.h $tmpdir/extension.h
 
 [[ ! -a $tmpdir/init.c ]] && {
     cat > $tmpdir/init.c <<EOF
 #include <linux/module.h>
 #include "extension.h"
+#include "app.h"
 
 //  Define GOT
 app_got_t* app_got;
@@ -161,6 +173,9 @@ ext.ko: ${cfiles[@]}
 
 libextension.a: dpld.o extension.o ext.kbin
 	ar rcs \$@ \$^
+
+app.h: app_orig.h
+	$scriptdir/genappheader app.h app_got.h app_orig.h
 
 dpld.o: dpld.c extension.h app.h
 	gcc -Wall -Wextra -mno-red-zone -fno-omit-frame-pointer -Wfatal-errors -fPIC -I $symlibdir/include -DDDYNLINK -c -o \$@ \$<

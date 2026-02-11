@@ -10,7 +10,7 @@
 #include "L1/stack_switch.h"
 
 #define DECLARE_ALL_FUNCS
-#include "app.h"
+#include "app_got.h"
 
 static int module_loaded = 0;
 static int verbose       = 1;
