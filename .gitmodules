@@ -15,7 +15,7 @@
 [submodule "redis"]
 	path = redis
 	url = git@github.com:F-Wilke/redis.git
-	branch = ukl-df-shortcut
+	branch = ukl-dl-shortcut
 [submodule "symVirtNetPollBinHack"]
 	path = symVirtNetPollBinHack
 	url = git@github.com:Symbi-OS/symVirtNetPollBinHack.git
@@ -52,3 +52,9 @@
 [submodule "binutils-gdb"]
 	path = binutils-gdb
 	url = git://sourceware.org/git/binutils-gdb.git
+[submodule "redis_dyn"]
+	path = redis_dyn
+	url = git@github.com:F-Wilke/Symbi-OS.git
+[submodule "memtier_bench"]
+	path = memtier_bench
+	url = https://github.com/F-Wilke/memtier_benchmark.git
