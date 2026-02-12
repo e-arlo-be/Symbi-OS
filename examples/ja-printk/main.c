@@ -21,6 +21,7 @@ static inline unsigned long get_exc_page_fault_addr()
 
   val = (unsigned long)dlsym(RTLD_DEFAULT, "asm_exc_page_fault");
 
+    
 
 #if 0
   __asm__ volatile (
@@ -31,6 +32,18 @@ static inline unsigned long get_exc_page_fault_addr()
 #endif
   return val;
 }
+
+int stacktouch(void)
+{
+  const int n=4096*8;
+  char data[n];
+  int sum;
+  
+  for (int i=0; i<n; i++) { sum+=data[i]; }
+  
+  return sum;
+}
+
 
 extern int overflowuid;
 
@@ -48,7 +61,9 @@ int main() {
 
     printf("pfaddr=0x%lx dfaddr=0x%lx\n", pfaddr, dfaddr);
 
+    int ss;
     sym_elevate();
+    ss = stacktouch();
     _printk("hello world\n");
     printf("main: called elevate\n");
     //run kernel_add
@@ -67,7 +82,8 @@ int main() {
     sym_lower();
     //   assert(pf == get_exc_page_fault_addr());
 
-    printf("pf_cnt=%ld df_cnt=%ld\n", pf_cnt, df_cnt);
+    printf("pf_cnt=%ld df_cnt=%ld ss=%d\n", pf_cnt, df_cnt,
+	   ss);
     
     printf("DONE\n");
     return 0;

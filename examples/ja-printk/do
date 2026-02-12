@@ -1,5 +1,5 @@
 #set -x
-[[ -a /sys/module/ext ]] && sudo rmmod ext
+#[[ -a /sys/module/ext ]] && sudo rmmod ext
 
 LD_LIBRARY_PATH=~/Symbi-OS/Symlib/dynam_build:$PWD
 echo $LD_LIBRARY_PATH
