@@ -20,7 +20,7 @@
 	url = git@github.com:Symbi-OS/symVirtNetPollBinHack.git
 [submodule "Tools"]
 	path = Tools
-	url = git@github.com:Symbi-OS/Tools.git
+	url = git@github.com:F-Wilke/Tools.git
 [submodule "Symlib"]
 	path = Symlib
 	url = git@github.com:Symbi-OS/Symlib.git

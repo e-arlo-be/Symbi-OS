@@ -31,7 +31,7 @@ pf_adaptor_asm_fix_err_code_u:
 pf_adaptor_asm_fix_err_code_uw:
 	// used to fix double fault 
 	// x86 allows immediate and memory operands without using a register
-//	incq  (pf_adaptor_df_cnt)
+//	incq  pf_adaptor_df_cnt
 	orl   $(ERRCODE_PF_USER|ERRCODE_PF_WRITE), (%rsp)
 	jmp   *pf_adaptor_asm_exc_page_fault	
 	// int3 to satifiy objtool desire for a trap after a speculative jump to try and improve security
