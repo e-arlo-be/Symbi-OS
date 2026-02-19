@@ -37,9 +37,9 @@ int pf_adaptor_init(unsigned long asm_exc_page_fault,
 {
   gate_desc * idt = idt_adaptor_clone();
   gate_desc   gate;
-  intptr_t    val;
+  unsigned long val;
   bool        dirty = false;
-
+  
   if (pf_adaptor_asm_exc_page_fault == 0) {
     pf_adaptor_asm_exc_page_fault = asm_exc_page_fault;
   }
@@ -49,13 +49,13 @@ int pf_adaptor_init(unsigned long asm_exc_page_fault,
   //    system pf handler : see assembly code
   read_gate(idt, X86_TRAP_PF, &gate);
   val = gate_offset(&gate);
-  if (val != (intptr_t)asm_exc_page_fault) {
-    if (val != pf_adaptor_asm_fix_err_code_u) {
+  if (val != (unsigned long)asm_exc_page_fault) {
+    if (val != (unsigned long)&pf_adaptor_asm_fix_err_code_u) {
       printk("WARNING: unexpected PF handler installed %lx", val); 
       goto error;
     } 
   } else {
-    gate_set_offset(&gate, pf_adaptor_asm_fix_err_code_u);
+    gate_set_offset(&gate, (unsigned long)&pf_adaptor_asm_fix_err_code_u);
     write_idt_entry(idt, X86_TRAP_PF, &gate);
     dirty = true;
   }
@@ -68,13 +68,13 @@ int pf_adaptor_init(unsigned long asm_exc_page_fault,
   //  see assembly code
   read_gate(idt, X86_TRAP_DF, &gate);
   val = gate_offset(&gate);
-  if (val != (intptr_t)asm_exc_double_fault) {
-    if (val != pf_adaptor_asm_fix_err_code_uw) {
+  if (val != (unsigned long)asm_exc_double_fault) {
+    if (val != (unsigned long)&pf_adaptor_asm_fix_err_code_uw) {
             printk("WARNING: unexpected DF handler installed %lx", val); 
       goto error;
     }
   } else {
-    gate_set_offset(&gate, pf_adaptor_asm_fix_err_code_uw);
+    gate_set_offset(&gate, (unsigned long)&pf_adaptor_asm_fix_err_code_uw);
     write_idt_entry(idt, X86_TRAP_DF, &gate); 
     dirty = true;
   }
