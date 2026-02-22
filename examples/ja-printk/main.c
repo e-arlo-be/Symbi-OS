@@ -66,6 +66,9 @@ int main() {
     ss = stacktouch();
     _printk("hello world\n");
     printf("main: called elevate\n");
+
+    // test_pfasm();
+
     //run kernel_add
     int sum = kernel_add(3, 4);
     printf("printf: kernel_add(3, 4) = %d\n", sum);

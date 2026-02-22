@@ -2,6 +2,11 @@
 #include <asm/idtentry.h>
 #include "idtadaptor.h"
 
+#include <linux/smp.h> //for on_each_cpu
+#include <asm/asm-offsets.h> // for IDT_ENTRIES
+
+
+
 gate_desc *orig_idt    = NULL;
 gate_desc *current_idt = NULL;
 
@@ -27,12 +32,20 @@ gate_desc * idt_adaptor_clone(void) {
   return new_idt;
 }
 
+//on_each_cpu callback to load idt on each cpu. 
+//load_idt is a macro that cannot be passed to on_each_cpu
+void load_idt_wrapper(void* dtr) {
+  load_idt((struct desc_ptr *)dtr);
+}
+
 void idt_adaptor_activate(const gate_desc *idt) {
   struct desc_ptr idtr = {
     .size	= (IDT_ENTRIES * sizeof(gate_desc)) - 1,
     .address	= (unsigned long)idt
   };
-  load_idt(&idtr);
+    
+  // load_idt_wrapper(&idtr);
+  on_each_cpu(load_idt_wrapper, &idtr, 1); // 1 means wait for completion of all CPUs before returning
 
   // make it current
   if (current_idt) {

@@ -20,10 +20,30 @@ pf_adaptor_asm_fix_err_code_u:
 	//      address and fault type are sensible.  
 	// x86 allows immediate and memory operands without using a register
 	incq  pf_adaptor_pf_cnt
-	orl   $ERRCODE_PF_USER, (%rsp)
+	//check current->symbiote_elevated and only set user bit if elevated
+	pushq %rax
+
+	rdgsbase %rax
+	test %rax, %rax
+	jns  .Lskip_user_bit //gsbase is positve or zero (no sign flag) => user mode => definitely not elevated. 
+
+	movq %gs:current_task(%rip), %rax
+	// movq $0x1, %rax
+	testb $1, TASK_symbiote_elevated(%rax)
+	// testb $1, %al
+	jz  .Lskip_user_bit
+
+	orl   $ERRCODE_PF_USER, 8(%rsp)
+
+.Lskip_user_bit:
+	popq %rax
+
 	jmp   *pf_adaptor_asm_exc_page_fault
 	// int3 to satifiy objtool desire for a trap after a speculative jump to try and improve security
 	int3
+
+
+
 
 	.text
 	.align 16
@@ -32,8 +52,98 @@ pf_adaptor_asm_fix_err_code_uw:
 	// used to fix double fault 
 	// x86 allows immediate and memory operands without using a register
 	incq  pf_adaptor_df_cnt
-	orl   $(ERRCODE_PF_USER|ERRCODE_PF_WRITE), (%rsp)
-	jmp   *pf_adaptor_asm_exc_page_fault	
+	pushq %rax
+	//which assumptions can I make about gs base after a double fault? 
+	//paranoid entry reads from $0xc0000101 to get a value for gsbase. So I can clearly not 
+/*
+	It swaps gs if the value read from 0xc0000101 not a kernel address. It does nothing if the value is a kernel address. 
+	So I can also just check that.
+   0xffffffff81001c46 <+134>:   mov    $0x1,%ebx
+   0xffffffff81001c4b <+139>:   mov    $0xc0000101,%ecx
+   0xffffffff81001c50 <+144>:   rdmsr
+   0xffffffff81001c52 <+146>:   test   %edx,%edx
+   0xffffffff81001c54 <+148>:   js     0xffffffff81001c5b <paranoid_entry+155>
+   0xffffffff81001c56 <+150>:   xor    %ebx,%ebx
+   0xffffffff81001c58 <+152>:   swapgs
+*/
+	//the same check as in paranoid_entry
+	rdgsbase %rax
+	test %rax, %rax
+	jns  .Lskip_df_set //if gsbase is not a kernel address, we're not elevated
+
+	//if gsbase is garbage but looks like a kernel address exc_double_fault would also blow up, 
+	// so we might as well blow up here
+	movq %gs:current_task(%rip), %rax 
+
+	testb $1, TASK_symbiote_elevated(%rax)
+
+	jz  .Lskip_df_set
+
+	orl   $(ERRCODE_PF_USER|ERRCODE_PF_WRITE), 8(%rsp)
+	popq %rax
+	jmp   *pf_adaptor_asm_exc_page_fault 
+
+
+.Lskip_df_set:
+	popq %rax
+
+	jmp   *pf_adaptor_asm_exc_double_fault	
 	// int3 to satifiy objtool desire for a trap after a speculative jump to try and improve security
 	int3
 	
+
+
+
+	.text
+	.align 16
+	.global pf_adaptor_asm_fix_err_code_gp
+pf_adaptor_asm_fix_err_code_gp:
+	// General protection fault handler
+	// x86 allows immediate and memory operands without using a register
+	incq  pf_adaptor_gp_cnt
+
+	//here we just want to swing to s safe stack
+	test %rsp, %rsp
+	js .Lskip_gp_fix //if we're already on a kernel stack, we don't need to do anything.
+	
+	push %rax //we need one scratch register
+	movq %rsp, %rax
+	//we can assume that gsbase is valid because we must be elevated.
+	movq %gs:(cpu_tss_rw + TSS_sp0)(%rip), %rsp
+	//now push the exception info on the new stack
+// 	SS
+	pushq 0x0 //fake SS
+// RSP
+	pushq %rax //RSP
+// RFLAGS
+	pushq 32(%rax)
+// CS
+	pushq 24(%rax)
+// RIP
+	pushq 16(%rax)
+// error code   (for #GP: selector index or 0)
+	pushq 8(%rax)
+
+	movq (%rax), %rax 
+
+	// For GP faults from elevated code, we may want to modify error code handling
+	// The error code for GP faults has a different format than page faults
+	// For now, we just ensure the handler knows we're elevated by preserving the error code
+
+.Lskip_gp_fix:
+
+	jmp   *pf_adaptor_asm_exc_general_protection
+	// int3 to satisfy objtool desire for a trap after a speculative jump to try and improve security
+	int3
+
+
+
+
+	.text
+	.align 16
+	.global ret_stub
+ret_stub:
+	ret
+	int3
+
+

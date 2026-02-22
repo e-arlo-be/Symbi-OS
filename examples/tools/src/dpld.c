@@ -33,7 +33,7 @@ extern int __x64_sys_init_module(void* args);
 
 //__x64_sys_init_module expects the arguments to be on the stack
 void do_load_module(void* umod, unsigned long len, char* uargs, unsigned long pfaddr, unsigned long dfaddr,
-		    int* ret_out) {
+		    unsigned long gpaddr, int* ret_out) {
     //prepare argument passing
     // mov    0x60(%rdi),%rdx
     // mov    0x68(%rdi),%rsi
@@ -49,10 +49,10 @@ void do_load_module(void* umod, unsigned long len, char* uargs, unsigned long pf
         *ret_out = ret;
     }
     {
-      int (*func)(unsigned long, unsigned long);
+      int (*func)(unsigned long, unsigned long, unsigned long);
       func = (void *)kallsyms_lookup_name("pf_adaptor_init");
       // page fault adaptor to ensure faults to
-      func(pfaddr, dfaddr);
+      func(pfaddr, dfaddr, gpaddr);
     }
 }
 
@@ -116,8 +116,14 @@ int load_ext_module() {
     assert(0);
     return 0;
   }
+  unsigned long gpaddr;
+  if (!resolve_sym("asm_exc_general_protection", (void **)&gpaddr)) {
+    VPRINTF("failed to resolve asm_exc_general_protection\n");
+    assert(0);
+    return 0;
+  }
   
-  VPRINTF("ktos=%lx pfaddr=%lx dfaddr=%lx\n", ktos, pfaddr, dfaddr);
+  VPRINTF("ktos=%lx pfaddr=%lx dfaddr=%lx gpaddr=%lx\n", ktos, pfaddr, dfaddr, gpaddr);
   
   VPRINTF("starting load_module\n");
   
@@ -125,7 +131,7 @@ int load_ext_module() {
   
   SYM_ON_KERN_STACK_DYNSYM_DO(ktos, 
 			      do_load_module((void*)_binary_ext_ko_start,
-					     size, uargs, pfaddr, dfaddr, &ret));
+					     size, uargs, pfaddr, dfaddr, gpaddr, &ret));
   
   VPRINTF("do_load_module: exited __x64_sys_init_module ret=%d\n", ret);
   
