@@ -1,6 +1,6 @@
 .PHONY: clean distclean
 
-valkey/valkey-server: kcut/extension.a
+valkey/valkey-server: kcut/extension.a valkey/Makefile
 	make -C valkey V=1
 
 kcut/extension.a:

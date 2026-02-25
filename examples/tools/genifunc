@@ -94,9 +94,14 @@ def process_files(source_filenames):
                         
     return sorted(list(all_global_variables)), sorted(list(all_function_prototypes)), sorted(list(all_ifuncs))
 
-def write_files(c_filename, global_vars, func_protos, ifuncs):
+def write_files(c_filename, includes, global_vars, func_protos, ifuncs):
     """Writes the ifuncs to a single source file."""
-    c_content = [
+    c_content = []
+    for inc in includes:
+        c_content.append(f"#include \"{inc}\"")
+  
+    c_content.extend([
+        "",
         "extern void *dpld_resolver(char * symbol_name);",
         "",
         "// macro to define a function as an ifunc and to define a simple",
@@ -107,7 +112,7 @@ def write_files(c_filename, global_vars, func_protos, ifuncs):
         "      return (rettype (*) args) dpld_resolver(#name); \\",
         "   } ",
         ""
-    ]
+    ])
     
     if ifuncs:
         c_content.append("// generate ifunc for ext function found");
@@ -136,4 +141,4 @@ if __name__ == "__main__":
         sys.exit(1)
             
     globals_list, functions_list, ifunc_list = process_files(kh_files)
-    write_files(output_c_name, globals_list, functions_list, ifunc_list)
+    write_files(output_c_name, kh_files, globals_list, functions_list, ifunc_list)
