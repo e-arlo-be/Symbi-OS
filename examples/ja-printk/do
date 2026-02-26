@@ -9,4 +9,4 @@ echo $LD_LIBRARY_PATH
 # BIND_NOW kludge until we get page fault mitigated
 #sudo LD_BIND_NOW=1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./main
 
-sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./main
+sync; sync; sync; sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./main
