@@ -150,6 +150,7 @@ static void __exit ext_exit(void)
     if (&extension_exit != NULL) extension_exit();	    
 }
 
+
 void set_app_got(app_got_t* got) {
     app_got = got;
     // pr_info("%s: app_got set to 0x%p\n", MODULE_NAME, app_got);
