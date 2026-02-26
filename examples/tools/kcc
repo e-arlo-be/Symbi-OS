@@ -113,22 +113,25 @@ static char *name = "dynpriv extension";
 module_param(name, charp, S_IRUGO);
 MODULE_PARM_DESC(name, "The name to display in /var/log/kern.log");
 
-
-static int __init extension_init(void)
+extern int extension_init(void) __attribute__((weak));
+static int __init ext_init(void)
 {
   pr_info("%s: module loaded at 0x%p\n", MODULE_NAME, extension_init);
   pr_info("%s: args: name=%s\n", MODULE_NAME, name);
+  if (&extension_init != NULL) return extension_init();
   return 0;
 }
 
-static void __exit extension_exit(void)
+extern void extension_exit(void) __attribute__((weak));
+static void __exit ext_exit(void)
 {
     pr_info("%s: goodbye %s\n", MODULE_NAME, name);
     pr_info("%s: module unloaded from 0x%p\n", MODULE_NAME, extension_exit);
+    if (&extension_exit != NULL) extension_exit();	    
 }
 
-module_init(extension_init);
-module_exit(extension_exit);
+module_init(ext_init);
+module_exit(ext_exit);
 EOF
 }
 
