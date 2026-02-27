@@ -38,7 +38,6 @@ gate_set_offset(gate_desc *gate, unsigned long addr)
 
 unsigned long pf_adaptor_asm_exc_page_fault = 0;
 unsigned long pf_adaptor_asm_exc_double_fault = 0;
-unsigned long pf_adaptor_asm_exc_general_protection = 0;
 int pf_adaptor_init(unsigned long asm_exc_page_fault,
 		    unsigned long asm_exc_double_fault,
 		    unsigned long asm_exc_general_protection)
@@ -98,25 +97,6 @@ int pf_adaptor_init(unsigned long asm_exc_page_fault,
     dirty = true;
   }
   
-  if (pf_adaptor_asm_exc_general_protection == 0) {
-    pf_adaptor_asm_exc_general_protection = asm_exc_general_protection;
-  }
-
-  // install our "fix" to gp handler if needed
-  //  general protection faults from elevated code should be handled appropriately
-  //  see assembly code
-  read_gate(idt, X86_TRAP_GP, &gate);
-  val = gate_offset(&gate);
-  if (val != (unsigned long)asm_exc_general_protection) {
-    if (val != (unsigned long)&pf_adaptor_asm_fix_err_code_gp) {
-      printk("WARNING: unexpected GP handler installed %lx", val); 
-      goto error;
-    }
-  } else {
-    gate_set_offset(&gate, (unsigned long)&pf_adaptor_asm_fix_err_code_gp);
-    write_idt_entry(idt, X86_TRAP_GP, &gate); 
-    dirty = true;
-  }
 
   if (dirty) idt_adaptor_activate(idt);
   else       idt_adaptor_release(idt);

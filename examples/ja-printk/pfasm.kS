@@ -21,8 +21,15 @@ pf_adaptor_asm_fix_err_code_u:
 	// x86 allows immediate and memory operands without using a register
 	incq  pf_adaptor_pf_cnt
 	//check current->symbiote_elevated and only set user bit if elevated
-	pushq %rax
+	
+	testq %rsp, %rsp
+	js .Lskip_stack_touch
+	sti //if we page fault again, we must not have interrupts disabled, otherwise do_user_addr_fault will issue a warning.
+	movb $1, -0x1000(%rsp) //touch stack so that 
+	cli
 
+.Lskip_stack_touch:
+	pushq %rax
 	rdgsbase %rax
 	test %rax, %rax
 	jns  .Lskip_user_bit //gsbase is positve or zero (no sign flag) => user mode => definitely not elevated. 
@@ -34,6 +41,8 @@ pf_adaptor_asm_fix_err_code_u:
 	jz  .Lskip_user_bit
 
 	orl   $ERRCODE_PF_USER, 8(%rsp)
+
+
 
 .Lskip_user_bit:
 	popq %rax
@@ -91,59 +100,4 @@ pf_adaptor_asm_fix_err_code_uw:
 	// int3 to satifiy objtool desire for a trap after a speculative jump to try and improve security
 	int3
 	
-
-
-
-	.text
-	.align 16
-	.global pf_adaptor_asm_fix_err_code_gp
-pf_adaptor_asm_fix_err_code_gp:
-	// General protection fault handler
-	// x86 allows immediate and memory operands without using a register
-	incq  pf_adaptor_gp_cnt
-
-	//here we just want to swing to s safe stack
-	test %rsp, %rsp
-	js .Lskip_gp_fix //if we're already on a kernel stack, we don't need to do anything.
-	
-	push %rax //we need one scratch register
-	movq %rsp, %rax
-	//we can assume that gsbase is valid because we must be elevated.
-	movq %gs:(cpu_tss_rw + TSS_sp0)(%rip), %rsp
-	//now push the exception info on the new stack
-// 	SS
-	pushq 0x0 //fake SS
-// RSP
-	pushq %rax //RSP
-// RFLAGS
-	pushq 32(%rax)
-// CS
-	pushq 24(%rax)
-// RIP
-	pushq 16(%rax)
-// error code   (for #GP: selector index or 0)
-	pushq 8(%rax)
-
-	movq (%rax), %rax 
-
-	// For GP faults from elevated code, we may want to modify error code handling
-	// The error code for GP faults has a different format than page faults
-	// For now, we just ensure the handler knows we're elevated by preserving the error code
-
-.Lskip_gp_fix:
-
-	jmp   *pf_adaptor_asm_exc_general_protection
-	// int3 to satisfy objtool desire for a trap after a speculative jump to try and improve security
-	int3
-
-
-
-
-	.text
-	.align 16
-	.global ret_stub
-ret_stub:
-	ret
-	int3
-
 
