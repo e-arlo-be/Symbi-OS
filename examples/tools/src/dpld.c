@@ -5,6 +5,8 @@
 #include <string.h>
 #include <errno.h>
 #include <dlfcn.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #include "LINF/sym_all.h"
 #include "L1/stack_switch.h"
@@ -28,32 +30,27 @@ extern const uint8_t _binary_ext_ko_start[];
 extern const uint8_t _binary_ext_ko_end[];
 extern const uint8_t _binary_ext_ko_size;
 
-// extern int load_module(struct load_info *info, char *uargs,int flags);
-extern int __x64_sys_init_module(void* args);
+void extra_init(unsigned long pfaddr, unsigned long dfaddr, int *ret)
+{
+  int (*func)(unsigned long, unsigned long);
+  func = (void *)kallsyms_lookup_name("pf_adaptor_init");
+  // page fault adaptor to ensure faults to
+  *ret = func(pfaddr, dfaddr);
+}
 
-//__x64_sys_init_module expects the arguments to be on the stack
-void do_load_module(void* umod, unsigned long len, char* uargs, unsigned long pfaddr, unsigned long dfaddr,
-		    unsigned long gpaddr, int* ret_out) {
-    //prepare argument passing
-    // mov    0x60(%rdi),%rdx
-    // mov    0x68(%rdi),%rsi
-    // mov    0x70(%rdi),%rdi
-    
-    uint64_t args[3];
-    args[0] = (uint64_t)uargs; //rdx
-    args[1] = (uint64_t)len; //rsi
-    args[2] = (uint64_t)umod; //rdi
-
-    int ret = __x64_sys_init_module((void*)(args) - 0x60);
-    if (ret_out) {
-        *ret_out = ret;
+int init_module(void* umod, unsigned long len, char* uargs)
+{
+  int ret;
+  ret=syscall(__NR_init_module, umod, len, uargs);
+  if (ret == -1) {
+    perror("Error loading module");
+    if (errno == EEXIST) {
+      VPRINTF("Already loaded...\n");
+    } else {
+      assert(0);
     }
-    {
-      int (*func)(unsigned long, unsigned long, unsigned long);
-      func = (void *)kallsyms_lookup_name("pf_adaptor_init");
-      // page fault adaptor to ensure faults to
-      func(pfaddr, dfaddr, gpaddr);
-    }
+  }
+  return ret;
 }
 
 static int
@@ -76,7 +73,6 @@ force_symres_now()
   void *value;
   // force symbol resolution before we elevate  
   // lookup symbols to avoid problems once elevated -- touch symbol tables
-  if (!resolve_sym("__x64_sys_init_module", &value)) return 0;
   if (!resolve_sym("cpu_current_top_of_stack", &value)) return 0;
   if (!resolve_sym("kallsyms_lookup_name", &value)) return 0;
   if (!resolve_sym("vmalloc_noprof", &value)) return 0;
@@ -123,19 +119,24 @@ int load_ext_module() {
     return 0;
   }
   
-  VPRINTF("ktos=%lx pfaddr=%lx dfaddr=%lx gpaddr=%lx\n", ktos, pfaddr, dfaddr, gpaddr);
   
   VPRINTF("starting load_module\n");
   
-  VPRINTF("do_load_module: umod=%p len=%lu uargs=%p\n", uargs, size, uargs);
+  VPRINTF("init_module: umod=%p len=%lu uargs=%p\n", uargs, size, uargs);
   
-  SYM_ON_KERN_STACK_DYNSYM_DO(ktos, 
-			      do_load_module((void*)_binary_ext_ko_start,
-					     size, uargs, pfaddr, dfaddr, gpaddr, &ret));
+ 
+  ret = init_module((void*)_binary_ext_ko_start, size, uargs);
   
-  VPRINTF("do_load_module: exited __x64_sys_init_module ret=%d\n", ret);
+  VPRINTF("init_load_module: ret=%d\n", ret);
+
+  VPRINTF("extra_init: ktos=%lx pfaddr=%lx dfaddr=%lx\n", ktos, pfaddr, dfaddr);
+  if (ret == 0) {
+    SYM_ON_KERN_STACK_DYNSYM_DO(ktos, 
+				extra_init(pfaddr, dfaddr, &ret));
+  }
+  VPRINTF("extra_init: ret=%d\n", ret);
   
-  VPRINTF("exited load_module ret=%d\n", ret);
+  VPRINTF("exited load_ext_module ret=%d\n", ret);
   return ret;
 }
 
@@ -148,7 +149,7 @@ void* dpld_resolver(char* symbol_name) {
     int rc;
 
     rc = load_ext_module();
-    if (rc != 0) {
+    if (rc != 1) {
       VPRINTF("Failed to load ext module: %d\n", rc);
       //      exit(1);
     }

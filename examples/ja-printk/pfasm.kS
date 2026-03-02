@@ -58,7 +58,8 @@ pf_adaptor_asm_fix_err_code_u:
 	.align 16
 	.global pf_adaptor_asm_fix_err_code_uw
 pf_adaptor_asm_fix_err_code_uw:
-	// used to fix double fault 
+	// This will be executed on the kernel IST stack
+	// fix double fault 
 	// x86 allows immediate and memory operands without using a register
 	incq  pf_adaptor_df_cnt
 	pushq %rax

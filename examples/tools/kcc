@@ -201,7 +201,7 @@ make -C $tmpdir
 
 rtdir=$(realpath --relative-to=$PWD $tmpdir)
 
-[[ ! -a extension.h ]] && ln -s $rtdir/extension.h .
+# [[ ! -a extension.h ]] && ln -s $rtdir/extension.h .
 [[ ! -a app.h ]] && ln -s $rtdir/app.h .
 [[ ! -a libextension.a ]] && ln -s $rtdir/libextension.a .
 cp /proc/libkallsyms.so /proc/libkallsyms.a $curdir
