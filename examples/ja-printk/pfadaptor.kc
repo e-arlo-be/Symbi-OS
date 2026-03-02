@@ -6,7 +6,6 @@
 // from assembly code
 extern unsigned long pf_adaptor_asm_fix_err_code_u;
 extern unsigned long pf_adaptor_asm_fix_err_code_uw;
-extern unsigned long pf_adaptor_asm_fix_err_code_gp;
 
 // module specfic statics
 unsigned long int pf_adaptor_pf_cnt = 0;
@@ -44,10 +43,10 @@ int pf_adaptor_init(unsigned long asm_exc_page_fault,
 {
   print_idt_entries();
 
-  printk("old handlers at %lx (pf), %lx (df), and %lx (gp)\n", 
-         asm_exc_page_fault, asm_exc_double_fault, asm_exc_general_protection);
-  printk("new handlers at %lx (pf), %lx (df), and %lx (gp)\n", 
-         &pf_adaptor_asm_fix_err_code_u, &pf_adaptor_asm_fix_err_code_uw, &pf_adaptor_asm_fix_err_code_gp);
+  printk("old handlers at %lx (pf), %lx (df)\n", 
+         asm_exc_page_fault, asm_exc_double_fault);
+  printk("new handlers at %lx (pf), %lx (df) \n", 
+         &pf_adaptor_asm_fix_err_code_u, &pf_adaptor_asm_fix_err_code_uw);
 
   gate_desc * idt = idt_adaptor_clone();
   gate_desc   gate;
