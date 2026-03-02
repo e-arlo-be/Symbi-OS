@@ -1,0 +1,14 @@
+#!/bin/bash
+pushd valkey
+
+if [ ! -f "libkallsyms.so" ]; then
+    sudo cp /proc/libkallsyms.so .
+fi
+
+
+COMMAND="sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. $1"
+
+echo $COMMAND
+$COMMAND
+
+popd
