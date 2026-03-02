@@ -56,7 +56,8 @@ master_clean:
 6.16.0-kElevate: LINUX_BUILD=--branch dynam_priv-6.16 --single-branch --depth 1
 6.16.0-kElevate: KERN_VER=$(KERN_REL)$(KERN_EXTRAVERSION)
 # 6.16.0-kElevate: CONFIG=$(HOME)/linuxConfigs/5.14/USE_ME/symbiote_config
-6.16.0-kElevate: CONFIG=$(HOME)/linuxConfigs/6.16/config-6.16.8-200.fc42.x86_64_Elevate_pvol
+# 6.16.0-kElevate: CONFIG=$(HOME)/linuxConfigs/6.16/config-6.16.8-200.fc42.x86_64_Elevate_pvol
+6.16.0-kElevate: CONFIG=$(HOME)/linuxConfigs/6.16/config-6.16.8-200.fc42.x86_64_Elevate_pnone
 6.16.0-kElevate: LOCAL_LINUX_PATH=./linux
 
 # 6.16.0-kElevate: l_all

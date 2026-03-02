@@ -1,0 +1,2 @@
+./interpos.o
+./main.o

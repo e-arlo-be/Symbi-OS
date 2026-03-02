@@ -1,5 +1,5 @@
 diff --git a/src/Makefile b/src/Makefile
-index 55cc15847..c9fa49803 100644
+index 55cc15847..77dee53f0 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -380,6 +380,8 @@ else
@@ -16,7 +16,7 @@ index 55cc15847..c9fa49803 100644
  # valkey-server
  $(SERVER_NAME): $(ENGINE_SERVER_OBJ)
 -	$(SERVER_LD) -o $@ $^ ../deps/libvalkey/lib/libvalkey.a ../deps/lua/src/liblua.a ../deps/hdr_histogram/libhdrhistogram.a ../deps/fpconv/libfpconv.a $(FINAL_LIBS)
-+	$(SERVER_LD) -o $@ $^ ../deps/libvalkey/lib/libvalkey.a ../deps/lua/src/liblua.a ../deps/hdr_histogram/libhdrhistogram.a ../deps/fpconv/libfpconv.a $(FINAL_LIBS) -L ../../kcut -lextension -lkallsyms -L ../../../../Symlib/dynam_build -lSym 
++	$(SERVER_LD) -o $@ $^ ../deps/libvalkey/lib/libvalkey.a ../deps/lua/src/liblua.a ../deps/hdr_histogram/libhdrhistogram.a ../deps/fpconv/libfpconv.a $(FINAL_LIBS) -L ../../kcut -lc -lextension -lkallsyms -L ../../../../Symlib/dynam_build -lSym 
  
  # Valkey static library, used to compile against for unit testing
  $(ENGINE_LIB_NAME): $(ENGINE_SERVER_OBJ)
