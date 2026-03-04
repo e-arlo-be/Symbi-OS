@@ -75,6 +75,12 @@ fi
     exit -1
 }
 
+mods=( $(find $PWD -maxdepth 1 -name '*.ko') )
+for m in ${mods[@]}; do
+    #create a symlink to the .ko in the tmpdir if it doesn't already exist
+    [[ ! -a $tmpdir/$(basename $m) ]] && ln -s $m $tmpdir/$(basename $m)
+done
+
 declare -a cfiles
 declare -a asmfiles
 
