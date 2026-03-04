@@ -13,6 +13,7 @@
 
 #define DECLARE_ALL_FUNCS
 #include "app_got.h"
+#include "modules.h"
 
 static int module_loaded = 0;
 static int verbose       = 0;
@@ -25,10 +26,6 @@ void (*set_app_got)(app_got_t* got);
 #define VPRINTF(fmt, ...) do {					\
     if (verbose) { fprintf(stderr, fmt, ##__VA_ARGS__); }	\
   } while(0)
-
-extern const uint8_t _binary_ext_ko_start[];
-extern const uint8_t _binary_ext_ko_end[];
-extern const uint8_t _binary_ext_ko_size;
 
 static void extra_init(unsigned long pfaddr, unsigned long dfaddr, int *ret)
 {
@@ -91,9 +88,9 @@ force_symres_now()
 static int load_ext_module() {
   VPRINTF("starting load_ext_module\n");
   int ret = 0;
-  size_t size = (size_t)&_binary_ext_ko_size;
   char * uargs = "name=Hansi";
   uintptr_t ktos;
+  size_t size;
   
   if (force_symres_now()==0) {
     VPRINTF("ERROR: failed to resolve symbols needed\n");
@@ -131,9 +128,8 @@ static int load_ext_module() {
   
   VPRINTF("init_module: umod=%p len=%lu uargs=%p\n", uargs, size, uargs);
   
- 
-  ret = init_module((void*)_binary_ext_ko_start, size, uargs);
-  
+  LOAD_ALL_MODULES();
+
   VPRINTF("init_load_module: ret=%d\n", ret);
 
   VPRINTF("extra_init: ktos=%lx pfaddr=%lx dfaddr=%lx\n", ktos, pfaddr, dfaddr);

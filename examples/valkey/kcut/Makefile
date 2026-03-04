@@ -9,4 +9,4 @@ libkallsyms.a:
 	cp /proc/$@ $@
 
 clean:
-	rm -rf $(wildcard $(TARGETS) *.o *.so *.a ext.kbin .ext)
+	rm -rf $(wildcard $(TARGETS) *.o *.so *.a *.kbin .ext)
