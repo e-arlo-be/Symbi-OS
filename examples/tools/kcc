@@ -161,23 +161,30 @@ cat > $tmpdir/Makefile <<EOF
 obj-m += ${name}.o
 ${name}-y := \$(patsubst %.c,%.o,${cfiles[@]}) \$(patsubst %.S,%.o,${asmfiles[@]}) init.o
 ccflags-y := -I $curdir
+
+KO_FILES := ext.ko \$(wildcard *.ko)
+KBIN_FILES := \$(KO_FILES:.ko=.kbin)
+
 .PHONY: all clean ext.ko
 
 all: libextension.a
 
-ext.kbin: ext.ko
+%.kbin: %.ko
 	ld -r -b binary -z noexecstack -o \$@ \$<
 
 ext.ko: ${cfiles[@]}
 	make -C ${LINUX_BUILD_PATH} M=${tmpdir} modules
 
-libextension.a: dpld.o extension.o ext.kbin
+libextension.a: dpld.o extension.o \$(KBIN_FILES)
 	ar rcs \$@ \$^
 
 app.h: app_orig.h
 	$scriptdir/genappheader app.h app_got.h app_orig.h
 
-dpld.o: dpld.c app.h
+modules.h: ext.ko
+	$scriptdir/genmodsheader -o modules.h \$(wildcard *.ko)
+
+dpld.o: dpld.c app.h modules.h
 	gcc -Wall -Wextra -mno-red-zone -fno-omit-frame-pointer -Wfatal-errors -fPIC -I $symlibdir/include -DDDYNLINK -c -o \$@ \$<
 
 extension.o: extension.c app.h
@@ -188,7 +195,7 @@ extension.c: ${hfiles[@]}
 
 clean:
 	make -C ${LINUX_BUILD_PATH} M=${tmpdir} clean
-	-rm -rf \$(wildcard *.o extension.c libextension.a ext.ko ext.bin )
+	-rm -rf \$(wildcard *.o extension.c libextension.a ext.ko *.kbin)
 
 EOF
 
