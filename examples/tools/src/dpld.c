@@ -31,6 +31,7 @@ static void extra_init(unsigned long pfaddr, unsigned long dfaddr, int *ret)
 {
   int (*func)(unsigned long, unsigned long);
   func = (void *)kallsyms_lookup_name("pf_adaptor_init");
+
   if (func) {
     *ret = func(pfaddr, dfaddr);
   } else {
