@@ -32,6 +32,7 @@ gate_set_offset(gate_desc *gate, unsigned long addr)
 }
 
 unsigned long pf_adaptor_asm_exc_page_fault = 0;
+unsigned long pf_adaptor_asm_exc_double_fault = 0;
 int pf_adaptor_init(unsigned long asm_exc_page_fault,
 		    unsigned long asm_exc_double_fault)
 {
@@ -60,6 +61,10 @@ int pf_adaptor_init(unsigned long asm_exc_page_fault,
     dirty = true;
   }
 
+
+   if (pf_adaptor_asm_exc_double_fault == 0) {
+    pf_adaptor_asm_exc_double_fault = asm_exc_double_fault;
+  }
 
   // install our "fix" to df handler of needed
   //  if we fault when taking a pf a double fault will be triggered
