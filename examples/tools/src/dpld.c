@@ -15,7 +15,7 @@
 #include "app_got.h"
 
 static int module_loaded = 0;
-static int verbose       = 1;
+static int verbose       = 0;
 
 extern unsigned long kallsyms_lookup_name(const char *name);
 extern void* vmalloc_noprof(unsigned long size);
@@ -30,11 +30,18 @@ extern const uint8_t _binary_ext_ko_start[];
 extern const uint8_t _binary_ext_ko_end[];
 extern const uint8_t _binary_ext_ko_size;
 
+extern int _printk(const char *fmt, ...);
+
 void extra_init(unsigned long pfaddr, unsigned long dfaddr, int *ret)
 {
   int (*func)(unsigned long, unsigned long);
   func = (void *)kallsyms_lookup_name("pf_adaptor_init");
-  // page fault adaptor to ensure faults to
+  //_printk("func: %px\n", func);
+  if (func) {
+    *ret = func(pfaddr, dfaddr);
+  } else {
+    *ret = -1;
+  }
   *ret = func(pfaddr, dfaddr);
 }
 
@@ -43,7 +50,7 @@ int init_module(void* umod, unsigned long len, char* uargs)
   int ret;
   ret=syscall(__NR_init_module, umod, len, uargs);
   if (ret == -1) {
-    perror("Error loading module");
+    VPRINTF("Error loading module errno=%d\n", errno);
     if (errno == EEXIST) {
       VPRINTF("Already loaded...\n");
     } else {
@@ -89,7 +96,7 @@ int load_ext_module() {
   uintptr_t ktos;
   
   if (force_symres_now()==0) {
-    fprintf(stderr, "ERROR: failed to resolve symbols needed\n");
+    VPRINTF("ERROR: failed to resolve symbols needed\n");
     assert(0);
     return 0;
   }
@@ -133,9 +140,9 @@ int load_ext_module() {
   if (ret == 0) {
     SYM_ON_KERN_STACK_DYNSYM_DO(ktos, 
 				extra_init(pfaddr, dfaddr, &ret));
+    VPRINTF("extra_init: ret=%d\n", ret);
+    assert(ret != -1);
   }
-  VPRINTF("extra_init: ret=%d\n", ret);
-  
   VPRINTF("exited load_ext_module ret=%d\n", ret);
   return ret;
 }
@@ -143,8 +150,19 @@ int load_ext_module() {
 //resolves a symbol by name, loading the module if necessary
 //this is for symbols from the kernel module included in our fat binary
 void* dpld_resolver(char* symbol_name) {
-  VPRINTF("%s: Resolving symbol %s\n", __func__, symbol_name);
+  static unsigned long ktos = 0;
+  unsigned long addr;
   
+  if (!verbose && getenv("DPLD_DEBUG")) verbose=1;
+  
+  VPRINTF("%s: Resolving symbol %s\n", __func__, symbol_name);
+
+  if (ktos == 0 && !resolve_sym("cpu_current_top_of_stack", (void **)&ktos)) {
+    VPRINTF("failed to resolve cpu_current_top_of_stack\n");
+    assert(0);
+    return 0;
+  }
+
   if (!module_loaded) {
     int rc;
 
@@ -179,11 +197,12 @@ void* dpld_resolver(char* symbol_name) {
     
     module_loaded = 1;
   }
-  
-  sym_elevate();
-  unsigned long addr = kallsyms_lookup_name(symbol_name);
+
+
+  SYM_ON_KERN_STACK_DYNSYM_DO(ktos,
+			      addr=kallsyms_lookup_name(symbol_name));
+
   VPRINTF("Resolved symbol %s to address %p\n", symbol_name, (void*)addr);
-  sym_lower();
   
   if (addr == 0) {
     VPRINTF("Symbol %s not found!\n", symbol_name);
