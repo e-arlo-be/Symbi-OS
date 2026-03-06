@@ -7,13 +7,14 @@ CFLAGS = -O0 -ggdb -Wall -Wextra -mno-red-zone -fno-omit-frame-pointer -Wfatal-e
 CFLAGS += -I ../../Symlib/include -DDYNLINK
 
 TARGETS :=  main main_static
+MODNAME := idt_adaptor.kbin
 .PHONY: all clean libkallsyms.so libkallsyms.a
 
 all: $(TARGETS)
 
 # extension boiler plate
-libextension.a ext.kbin: $(wildcard *.kc *.kh)
-	../tools/kcc
+libextension.a $(MODNAME): $(wildcard *.kc *.kh)
+	target=$(MODNAME) ../tools/kcc
 
 libkallsyms.so:
 	cp /proc/$@ $@

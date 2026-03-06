@@ -122,7 +122,7 @@ void set_app_got(app_got_t* got);
 app_got_t* app_got;
 
 //  Define the module metadata.
-#define MODULE_NAME "DYNPRIV_EXTENSION"
+#define MODULE_NAME "$name"
 MODULE_AUTHOR("BU SESA");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("BU SESA DYNPRIV PROCESS EXTENSION");
@@ -169,17 +169,17 @@ obj-m += ${name}.o
 ${name}-y := \$(patsubst %.c,%.o,${cfiles[@]}) \$(patsubst %.S,%.o,${asmfiles[@]}) init.o
 ccflags-y := -I $curdir
 
-KO_FILES := ext.ko \$(wildcard *.ko)
+KO_FILES := ${name}.ko \$(wildcard *.ko)
 KBIN_FILES := \$(KO_FILES:.ko=.kbin)
 
-.PHONY: all clean ext.ko
+.PHONY: all clean ${name}.ko
 
 all: libextension.a
 
 %.kbin: %.ko
 	ld -r -b binary -z noexecstack -o \$@ \$<
 
-ext.ko: ${cfiles[@]}
+${name}.ko: ${cfiles[@]}
 	make -C ${LINUX_BUILD_PATH} M=${tmpdir} modules
 
 libextension.a: dpld.o extension.o \$(KBIN_FILES)
@@ -188,7 +188,7 @@ libextension.a: dpld.o extension.o \$(KBIN_FILES)
 app.h: app_orig.h
 	$scriptdir/genappheader app.h app_got.h app_orig.h
 
-modules.h: ext.ko
+modules.h: ${name}.ko
 	$scriptdir/genmodsheader -o modules.h \$(wildcard *.ko)
 
 dpld.o: dpld.c app.h modules.h
@@ -202,7 +202,7 @@ extension.c: ${hfiles[@]}
 
 clean:
 	make -C ${LINUX_BUILD_PATH} M=${tmpdir} clean
-	-rm -rf \$(wildcard *.o extension.c libextension.a ext.ko *.kbin)
+	-rm -rf \$(wildcard *.o extension.c libextension.a ${name}.ko *.kbin)
 
 EOF
 
@@ -220,5 +220,5 @@ rtdir=$(realpath --relative-to=$PWD $tmpdir)
 [[ ! -a libextension.a ]] && ln -s $rtdir/libextension.a .
 cp /proc/libkallsyms.so /proc/libkallsyms.a $curdir
 
-#[[ ! -a ext.kbin ]] && ln -s $rtdir/ext.kbin .
+#[[ ! -a ${name}.kbin ]] && ln -s $rtdir/${name}.kbin .
 exit 0
