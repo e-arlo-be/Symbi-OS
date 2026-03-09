@@ -1,0 +1,7 @@
+#ifndef __KEVACUATE__H__
+#define __KEVACUATE__H__
+
+int acquire_exclusive_cpu(int reserved_cpu, int killifneeded);
+void release_exclusive_cpu(int reserved_cpu);
+
+#endif // __KEVACUATE__H__
