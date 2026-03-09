@@ -11,7 +11,7 @@
 #include <inttypes.h>
 #include "greeter.kh"
 #include "pfadaptor.kh"
-
+#include "evacuate.kh"
 
 static inline unsigned long get_exc_page_fault_addr()
 {
@@ -39,6 +39,38 @@ int stacktouch(void)
   for (int i=0; i<n; i+=4096) { data[i]=0xff; sum += data[i]; }
 
   return sum;
+}
+
+static inline int
+resolve_sym(char *name, void **value)
+{
+  char *error;
+  dlerror();  // clear as per manpage
+  *value = dlsym(RTLD_DEFAULT, name);
+  error = dlerror();
+  if (error != NULL) {
+    fprintf(stderr, "%s\n", error);
+    return 0;
+  }
+  return 1;
+}
+
+void evacuate()
+{
+  uintptr_t ktos;
+  int rc;
+  
+  if (!resolve_sym("cpu_current_top_of_stack", (void **)&ktos)) {
+    printf("failed to resolve cpu_current_top_of_stack\n");
+    assert(0);
+  }
+
+  SYM_ON_KERN_STACK_DYNSYM_DO(ktos, 
+			      rc=acquire_exclusive_cpu(0,0));
+
+  printf("acquire_exclusive_cpu: %d\n", rc);
+  
+  assert(rc==0);
 }
 
 // external kernel symbol forward declarations
@@ -74,6 +106,9 @@ int main(int argc, char **argv) {
   unsigned long df_cnt=0, pf_cnt=0;
 
   printf("\t%d: ELEVATED TESTS: START\n", mypid);
+
+  evacuate();
+  
   sym_elevate();
   
   printf("\t\t%d: %lx: PRIVILEGED INSTRUCTION TEST: START\n", mypid, cr3);

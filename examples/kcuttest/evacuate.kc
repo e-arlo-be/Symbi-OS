@@ -9,7 +9,7 @@
 // Store original affinities to restore later
 struct task_affinity {
     struct task_struct *task;
-    cpumask_var_t original_mask;
+    cpumask_t original_mask;
     struct list_head list;
 };
 
@@ -21,22 +21,16 @@ static DEFINE_SPINLOCK(affinity_lock);
 static int save_task_affinity(struct task_struct *task) {
     struct task_affinity *ta;
     
-    ta = kmalloc(sizeof(*ta), GFP_ATOMIC);
+    ta = kmalloc(sizeof(struct task_affinity), GFP_ATOMIC);
     if (!ta) {
         pr_warn("EVAC:Failed to allocate memory for task affinity\n");
-        return -ENOMEM;
-    }
-    
-    if (!alloc_cpumask_var(&ta->original_mask, GFP_ATOMIC)) {
-        kfree(ta);
-        pr_warn("EVAC: Failed to allocate cpumask for task affinity\n");
         return -ENOMEM;
     }
     
     // Save task and its original affinity
     ta->task = task;
     get_task_struct(task);  // Increment refcount
-    cpumask_copy(ta->original_mask, &task->cpus_mask);
+    cpumask_copy(&(ta->original_mask), &(task->cpus_mask));
     
     // Add to saved list
     spin_lock(&affinity_lock);
@@ -58,7 +52,7 @@ static int restore_saved_affinities(void) {
     if (ta->task == current) rc = 0;  // found ourselves! 
     // Check if task still exists (might have exited)
     if (pid_alive(ta->task)) {
-      set_cpus_allowed_ptr(ta->task, ta->original_mask);
+      set_cpus_allowed_ptr(ta->task, &ta->original_mask);
       restored++;
     } else {
       failed++;
@@ -66,7 +60,6 @@ static int restore_saved_affinities(void) {
     
     // Cleanup
     put_task_struct(ta->task);  // Decrement refcount
-    free_cpumask_var(ta->original_mask);
     list_del(&ta->list);
     kfree(ta);
   }
