@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -64,6 +65,9 @@ void evacuate()
 {
   uintptr_t ktos;
   int rc;
+  unsigned int cpu;
+
+  assert(getcpu(&cpu, NULL)==0);
   
   if (!resolve_sym("cpu_current_top_of_stack", (void **)&ktos)) {
     printf("failed to resolve cpu_current_top_of_stack\n");
@@ -71,7 +75,7 @@ void evacuate()
   }
 
   SYM_ON_KERN_STACK_DYNSYM_DO(ktos, 
-			      rc=acquire_exclusive_cpu(0,0));
+			      rc=acquire_exclusive_cpu(cpu,EVAC_KILL_NICELY));
 
   printf("acquire_exclusive_cpu: %d\n", rc);
   
