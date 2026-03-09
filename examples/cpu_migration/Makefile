@@ -7,13 +7,14 @@ CFLAGS = -O0 -ggdb -Wall -Wextra -mno-red-zone -fno-omit-frame-pointer -Wfatal-e
 CFLAGS += -I ../../Symlib/include -DDYNLINK
 
 TARGETS :=  main main_static
+MODNAME := helpers.kbin
 .PHONY: all clean libkallsyms.so libkallsyms.a
 
 all: $(TARGETS)
 
 # extension boiler plate
-libextension.a extension.h ext.kbin: $(wildcard *.kc *.kh)
-	../tools/kcc
+libextension.a $(MODNAME): $(wildcard *.kc *.kh)
+	target=$(MODNAME) ../tools/kcc
 
 libkallsyms.so:
 	cp /proc/$@ $@
@@ -22,7 +23,7 @@ libkallsyms.a:
 	cp /proc/$@ $@
 
 # main program
-main.o: main.c extension.h 
+main.o: main.c 
 	$(CC) $(CFLAGS) -c -o main.o main.c
 
 main:  main.o libextension.a libkallsyms.so
@@ -34,6 +35,4 @@ main_static: main.o libkallsyms.a libextension.a
 	$(CC) $(CFLAGS) -o $@ $^  libkallsyms.a libextension.a -lc -L../../Symlib/dynam_build -lSym  
 
 clean:
-	rm -rf $(wildcard $(TARGETS) *.o *.so *.a ext.kbin  extension.h .ext)
-
-
+	rm -rf $(wildcard $(TARGETS) *.o *.so *.a ext.kbin .ext)
