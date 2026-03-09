@@ -24,8 +24,6 @@ static inline unsigned long get_exc_page_fault_addr()
 
   val = (unsigned long)dlsym(RTLD_DEFAULT, "asm_exc_page_fault");
 
-    
-
 #if 0
   __asm__ volatile (
 		    "mov exc_page_fault, %0"
@@ -38,12 +36,13 @@ static inline unsigned long get_exc_page_fault_addr()
 
 int stacktouch(void)
 {
-  const int n=4096*8;
-  char data[n];
-  int sum;
-  
-  for (int i=0; i<n; i++) { sum+=data[i]; }
-  
+  const int PGSIZE=4096;
+  const int n=PGSIZE * 8;
+  volatile char data[n];
+  int sum = 0;
+
+  for (int i=0; i<n; i+=4096) { data[i]=0xff; sum += data[i]; }
+
   return sum;
 }
 
@@ -56,8 +55,8 @@ extern int _printk(const char *fmt, ...);
 int main(int argc, char **argv) {
   pid_t mypid = getpid();
   int ssec = 1;
-  unsigned long bloop=1000000000;
-  unsigned long yieldcnt=10;
+  signed long bloop=1000000000;
+  signed long yieldcnt=10;
   volatile void * _printk_ptr;
   
   _printk_ptr = (void *)_printk;
