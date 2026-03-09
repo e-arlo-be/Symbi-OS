@@ -27,3 +27,4 @@ echo $LD_LIBRARY_PATH
 #sudo kill -SIGUSR1 1
 sync; sync; sync; sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./main $@
 #sudo systemctl default
+

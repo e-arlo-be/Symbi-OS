@@ -42,8 +42,8 @@ int stacktouch(void)
   volatile char data[n];
   int sum = 0;
 
-  for (int i=0; i<n; i+=4096) { data[i]=0xff; sum += data[i]; }
-
+  for (int i=0; i<n; i+=4096) { data[i]=0xff; sum += data[i]; }  
+  
   return sum;
 }
 
@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
   if (argc > 1) ssec     = atoi(argv[1]);
   if (argc > 2) bloop    = atol(argv[2]);
   if (argc > 3) yieldcnt = atol(argv[3]);
-  if (argc > 4) evac = atoi(argv[4]);
+  if (argc > 4) evac     = atoi(argv[4]);
   
   printf("%d: BASIC KCUT TESTS: BEGIN: ssec=%d bloop=%lu yieldcnt=%lu\n", mypid, ssec, bloop, yieldcnt);
 
