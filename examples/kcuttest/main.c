@@ -88,12 +88,14 @@ int main(int argc, char **argv) {
   int ssec = 1;
   signed long bloop=1000000000;
   signed long yieldcnt=10;
+  int evac=1;
   volatile void * _printk_ptr;
   
   _printk_ptr = (void *)_printk;
   if (argc > 1) ssec     = atoi(argv[1]);
   if (argc > 2) bloop    = atol(argv[2]);
   if (argc > 3) yieldcnt = atol(argv[3]);
+  if (argc > 4) evac = atoi(argv[4]);
   
   printf("%d: BASIC KCUT TESTS: BEGIN: ssec=%d bloop=%lu yieldcnt=%lu\n", mypid, ssec, bloop, yieldcnt);
 
@@ -111,7 +113,7 @@ int main(int argc, char **argv) {
 
   printf("\t%d: ELEVATED TESTS: START\n", mypid);
 
-  evacuate();
+  if (evac) evacuate();
   
   sym_elevate();
   
