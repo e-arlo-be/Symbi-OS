@@ -1,10 +1,21 @@
 #!/bin/bash
 
+MODE="sleep"
+
+#-b for busy loop, -io for block on IO
+if [[ "$1" == "-b" ]]; then
+    MODE="busy"
+    shift
+elif [[ "$1" == "-io" ]]; then
+    MODE="io"
+    shift
+fi
+
 PROGRAM="./main"
 shift
 
 # Start program pinned to CPU 0
-taskset -c 0 $PROGRAM "$@" &
+taskset -c 0 "$PROGRAM" "$MODE" &
 PID=$!
 
 echo "Started $PROGRAM with PID $PID"
