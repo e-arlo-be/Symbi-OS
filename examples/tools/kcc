@@ -101,18 +101,16 @@ for s in ${src[@]}; do
 	t=$(basename ${s%.kS}.S)
 	asmfiles+=($t)
     fi
-
     [[ ! -a $tmpdir/$t ]] && ln -s $s $tmpdir/$t
 done
 
-#we also need extension.h in the tmpdir to generate libextension.a
-[[ ! -a $tmpdir/extension.h ]] && ln -s $PWD/extension.h $tmpdir/extension.h
 
 [[ ! -a $tmpdir/init.c ]] && {
     cat > $tmpdir/init.c <<EOF
 #include <linux/module.h>
-#include "extension.h"
 #include "app.h"
+
+void set_app_got(app_got_t* got);
 
 //  Define GOT
 app_got_t* app_got;
@@ -151,8 +149,8 @@ void set_app_got(app_got_t* got) {
     // pr_info("%s: app_got set to 0x%p\n", MODULE_NAME, app_got);
 }
 
-module_init(extension_init);
-module_exit(extension_exit);
+module_init(ext_init);
+module_exit(ext_exit);
 EOF
 }
 
