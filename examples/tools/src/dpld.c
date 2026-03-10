@@ -27,6 +27,10 @@ void (*set_app_got)(app_got_t* got);
     if (verbose) { fprintf(stderr, fmt, ##__VA_ARGS__); }	\
   } while(0)
 
+#define FATAL(fmt, ...) do {					\
+    fprintf(stderr, fmt, ##__VA_ARGS__); \
+  } while(0)
+
 static void extra_init(unsigned long pfaddr, unsigned long dfaddr, int *ret)
 {
   int (*func)(unsigned long, unsigned long);
@@ -209,7 +213,7 @@ void* dpld_resolver(char* symbol_name) {
     sym_elevate();
     set_app_got = (void (*)(app_got_t *))kallsyms_lookup_name("set_app_got");;
     if (!set_app_got) {
-      VPRINTF("Failed to resolve set_app_got symbol!\n");
+      FATAL("Failed to resolve set_app_got symbol!\n");
       exit(1);
     }
 
@@ -237,7 +241,7 @@ void* dpld_resolver(char* symbol_name) {
   VPRINTF("Resolved symbol %s to address %p\n", symbol_name, (void*)addr);
   
   if (addr == 0) {
-    VPRINTF("Symbol %s not found!\n", symbol_name);
+    FATAL("Symbol %s not found!\n", symbol_name);
     //exit program! We have a linkage problem
     exit(1);
   }
