@@ -18,8 +18,9 @@
 #define MODE_BUSY 2
 #define MODE_IO 3
 
-#define BUFFER_SIZE (1024 * 1024)  // 1MB buffer for I/O operations
+#define BUFFER_SIZE (1024 * 1024 * 256)  // 256MB buffer for I/O operations
 
+static char buffer[BUFFER_SIZE];
 //native kernel function that will be resolved at load time
 extern int _printk(const char *fmt, ...);
 
@@ -30,7 +31,7 @@ void dummy(void) {
 // Busy computation: calculate prime numbers
 void busy_work(void) {
     volatile uint64_t count = 0;
-    uint64_t limit = 100000;
+    uint64_t limit = 10000000;
     
     for (uint64_t num = 2; num < limit; num++) {
         int is_prime = 1;
@@ -48,7 +49,6 @@ void busy_work(void) {
 
 // Blocking I/O: write and read from a file
 void io_work(void) {
-    static char buffer[BUFFER_SIZE];
     static int initialized = 0;
     
     if (!initialized) {
