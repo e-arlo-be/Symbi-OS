@@ -130,6 +130,7 @@ static int killothers(int killifneeded) {
 }
 
 // Migrate all other non-kernel tasks
+//othermask: the mask to migrate other tasks to (should not include the reserved cpu)
 static int migrateothers(int reserved_cpu, cpumask_var_t othermask)
 {
   struct task_struct *p, *t;
@@ -139,6 +140,8 @@ static int migrateothers(int reserved_cpu, cpumask_var_t othermask)
   for_each_process(p) {
     for_each_thread(p, t) {
       if (t == current) continue;
+      if (should_preserve(t)) continue;  // skip essential processes
+
       if (cpumask_test_cpu(reserved_cpu, &t->cpus_mask)) {
 	rc = save_task_affinity(t);
 	if (rc != 0) {
