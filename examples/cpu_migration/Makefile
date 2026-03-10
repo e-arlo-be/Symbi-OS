@@ -7,7 +7,7 @@ CFLAGS = -O0 -ggdb -Wall -Wextra -mno-red-zone -fno-omit-frame-pointer -Wfatal-e
 CFLAGS += -I ../../Symlib/include -DDYNLINK
 
 TARGETS :=  main main_static
-MODNAME := helpers.kbin
+MODNAME := m0_helpers.kbin
 .PHONY: all clean libkallsyms.so libkallsyms.a
 
 all: $(TARGETS)

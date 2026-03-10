@@ -36,7 +36,6 @@ static void extra_init(unsigned long pfaddr, unsigned long dfaddr, int *ret)
   } else {
     *ret = -1;
   }
-  *ret = func(pfaddr, dfaddr);
   asm volatile(".global __extra_init_end\n"
 	       "__extra_init_end:");
   return;
