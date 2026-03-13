@@ -156,7 +156,20 @@ int main(int argc, char **argv) {
   for (int i=0; i<yieldcnt; i++) { sched_yield(); }
   printf("\t\t%d: %lx: USER YIELD TEST: END: we are back for yields\n", mypid, cr3);
 
-  //  printf("pf_cnt=%ld df_cnt=%ld\n", pf_cnt, df_cnt);
-  _printk("pf_cnt=%ld df_cnt=%ld\n", pf_cnt, df_cnt);
-  // sym_lower();
+  printf("\t\t%d: %lx: KERNEL YIELD TEST: START: yielding for %lu times\n", mypid, cr3, yieldcnt);
+  while (yieldcnt) {  __x64_sys_sched_yield(); yieldcnt--; }
+  printf("\t\t%d: %lx: KERNEL YIELD TEST: END: we are back for yields\n", mypid, cr3);
+  
+  printf("\t\t%d: %lx: USER SLEEP TEST: START: going to sleep for %d\n", mypid, cr3, ssec);
+  if (ssec) sleep(ssec);
+  printf("\t\t%d: %lx: USER SLEEP TEST: END: wokeup\n", mypid, cr3);
+  
+  printf("\t\t%d: %lx: USER BUSY LOOP TEST: START: going into busy loop for %lu\n", mypid, cr3, bloop);
+  while (bloop) { bloop--; }
+  printf("\t\t%d: %lx: USER BUSY LOOP TEST: END: %lu\n", mypid, cr3, bloop);
+  
+  sym_lower();
+  printf("\t%d: ELEVATED TESTS: END\n", mypid);  
+  printf("%d: BASIC KCUT TESTS: END\n", mypid);
+  return 0;
 }
