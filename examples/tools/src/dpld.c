@@ -92,10 +92,8 @@ force_symres_now()
 static int load_ext_module() {
   VPRINTF("starting load_ext_module\n");
   int ret = 0;
-  char * uargs = "name=Hansi";
   uintptr_t ktos;
-  size_t size;
-  
+   
   if (force_symres_now()==0) {
     VPRINTF("ERROR: failed to resolve symbols needed\n");
     assert(0);
@@ -129,8 +127,6 @@ static int load_ext_module() {
   
   
   VPRINTF("starting load_module\n");
-  
-  VPRINTF("init_module: umod=%p len=%lu uargs=%p\n", uargs, size, uargs);
   
   LOAD_ALL_MODULES();
 
