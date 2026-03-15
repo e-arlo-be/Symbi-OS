@@ -90,6 +90,7 @@ int main(int argc, char **argv) {
   signed long yieldcnt=10;
   int evac=1;
   volatile void * _printk_ptr;
+  unsigned num_forks = 1000;
   
   _printk_ptr = (void *)_printk;
   if (argc > 1) ssec     = atoi(argv[1]);
@@ -162,6 +163,20 @@ int main(int argc, char **argv) {
   printf("\t\t%d: %lx: USER BUSY LOOP TEST: START: going into busy loop for %lu\n", mypid, cr3, bloop);
   while (bloop) { bloop--; }
   printf("\t\t%d: %lx: USER BUSY LOOP TEST: END: %lu\n", mypid, cr3, bloop);
+  
+  printf("\t\t%d: %lx: FORK TEST: forking %lu times with stack touches\n", mypid, cr3, num_forks);
+  for (unsigned i=0; i<num_forks; i++) {
+    pid_t cpid = fork();
+    if (cpid==0) {
+      stacktouch();
+      exit(0);
+    } else if (cpid<0) {
+      printf("\t\t%d: %lx: FORK TEST: fork failed at iteration %lu\n", mypid, cr3, i);
+      break;
+    }
+  }
+  printf("\t\t%d: %lx: FORK TEST: END\n", mypid , cr3);
+
   
   sym_lower();
   printf("\t%d: ELEVATED TESTS: END\n", mypid);  
