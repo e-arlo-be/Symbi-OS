@@ -107,17 +107,16 @@ for s in ${src[@]}; do
 	t=$(basename ${s%.kS}.S)
 	asmfiles+=($t)
     fi
-
     [[ ! -a $tmpdir/$t ]] && ln -s $s $tmpdir/$t
 done
 
-#we also need extension.h in the tmpdir to generate libextension.a
-[[ ! -a $tmpdir/extension.h ]] && ln -s $PWD/extension.h $tmpdir/extension.h
 
 [[ ! -a $tmpdir/init.c ]] && {
     cat > $tmpdir/init.c <<EOF
 #include <linux/module.h>
 #include "app.h"
+
+void set_app_got(app_got_t* got);
 
 //  Define GOT
 app_got_t* app_got;
@@ -150,6 +149,7 @@ static void __exit ext_exit(void)
     pr_info("%s: module unloaded from 0x%p\n", MODULE_NAME, extension_exit);
     if (&extension_exit != NULL) extension_exit();	    
 }
+
 
 void set_app_got(app_got_t* got) {
     app_got = got;

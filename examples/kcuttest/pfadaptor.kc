@@ -46,7 +46,8 @@ int pf_adaptor_init(unsigned long asm_exc_page_fault,
   printk("old handlers at %lx (pf), %lx (df)\n", 
          asm_exc_page_fault, asm_exc_double_fault);
   printk("new handlers at %lx (pf), %lx (df) \n", 
-         &pf_adaptor_asm_fix_err_code_u, &pf_adaptor_asm_fix_err_code_uw);
+         (unsigned long)&pf_adaptor_asm_fix_err_code_u,
+	 (unsigned long)&pf_adaptor_asm_fix_err_code_uw);
 
   gate_desc * idt = idt_adaptor_clone();
   gate_desc   gate;
@@ -212,7 +213,8 @@ void test_pfasm() {
 
   if (cur_task == NULL) {//this never happens but I want the label to be before its reference
   my_return:
-      printk("test_pfasm: returned from pf_adaptor_asm_fix_err_code_u, stack_resident=%lu\n", stack_resident);
+      printk("test_pfasm: returned from pf_adaptor_asm_fix_err_code_u, stack_resident=%lu\n",
+	     (unsigned long)&(stack_resident[0]));
 
       for (int i = 0; i < 20; i++) {
         if (stack_resident[i] != i) {
@@ -222,7 +224,8 @@ void test_pfasm() {
       return;
   }
 
-  printk("test_pfasm: pf_adaptor_asm_fix_err_code_u @ 0x%lx, current task @ 0x%lx\n", &pf_adaptor_asm_fix_err_code_u, cur_task);
+  printk("test_pfasm: pf_adaptor_asm_fix_err_code_u @ 0x%lx, current task @ 0x%lx\n",
+	 (unsigned long)&pf_adaptor_asm_fix_err_code_u, (unsigned long)cur_task);
   // call the pfasm function that will trigger a page fault and return to the caller
   pf_adaptor_asm_exc_page_fault = (unsigned long)(&&my_return);
   asm volatile (

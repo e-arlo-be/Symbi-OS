@@ -5,7 +5,7 @@
 #include <linux/smp.h> //for on_each_cpu
 #include <asm/asm-offsets.h> // for IDT_ENTRIES
 
-
+void load_idt_wrapper(void* dtr);
 
 gate_desc *orig_idt    = NULL;
 gate_desc *current_idt = NULL;
