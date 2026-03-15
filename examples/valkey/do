@@ -5,11 +5,13 @@ if [ ! -f "libkallsyms.so" ]; then
     sudo cp /proc/libkallsyms.so .
 fi
 
+CONFIG_FILE="valkey.conf"
+
 #check -g flag to this script
 if [[ "$@" != *"-g"* ]]; then
-    COMMAND="sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. $1"    
+    COMMAND="sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. $1 $CONFIG_FILE"    
 else
-    COMMAND="sudo env -i LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. gdb $2"
+    COMMAND="sudo env -i LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. gdb $2 $CONFIG_FILE"
 fi
 
 

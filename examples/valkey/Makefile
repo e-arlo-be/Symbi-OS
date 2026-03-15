@@ -20,3 +20,11 @@ clean:
 
 distclean: clean
 	-${RM} -rf $(wildcard valkey)
+
+
+valkey-vanilla/Makefile:
+	git clone git@github.com:valkey-io/valkey.git valkey-vanilla
+	cd valkey-vanilla && git checkout -b 9.0.3 9.0.3
+
+valkey-vanilla/valkey-server: valkey-vanilla/Makefile
+	make -C valkey-vanilla V=1
